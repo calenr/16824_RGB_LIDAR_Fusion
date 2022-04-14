@@ -9,7 +9,8 @@
 *.pth
 *.zip
 *.pkl
-#data/
+data/
+results/
 runs/
 wandb/
 .idea/
