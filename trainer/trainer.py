@@ -141,6 +141,7 @@ class Trainer:
         """
         checkpoint = torch.load(self.args.checkpoint_path)
         self.start_epoch = checkpoint['epoch'] + 1
+        self.best_val_map = checkpoint['val_map']
 
         curr_arch = type(self.model).__name__
         if curr_arch != checkpoint['arch']:
