@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 import os
 from os import path as osp
+from PIL import Image
 
 def get_transforms(args) -> (transforms.Compose, transforms.Compose):
     """
@@ -28,9 +29,12 @@ class KittiDataset(Dataset):
     """
     # TODO
 
-    def __init__(self, args, data_path: str, transform: transforms.Compose,
+    def __init__(self, args, data_path: str, transform: transforms.Compose = None,
                 training:bool = True):
-        self.transform = transform
+        if transform is not None:
+            self.transform = transform
+        else:
+            self.transform = transforms.ToTensor()
         self.data_path = data_path
         self.training = training
         # split = "training" if self.training else "testing"
@@ -67,7 +71,29 @@ class KittiDataset(Dataset):
         return self.len
 
     def __getitem__(self, idx):
-        return torch.zeros(1), torch.ones(1)
+        # Load image
+        image_path = osp.join(self.image_data_path, self.image_files[idx])
+        image = Image.open(image_path).convert('RGB')
+        image = self.transform(image)
+
+        # Load Labels
+        if self.training:
+            label_path = osp.join(self.label_data_path, self.label_files[idx])
+            with open(label_path) as f:
+                label = f.readlines()
+        else:
+            label = torch.zeros((1))
+
+        # TODO: Load velodyne data
+        # https://github.com/Qjizhi/kitti-velodyne-viewer
+        velodyne = torch.zeros((1))
+
+        data = dict()
+        data['image'] = image
+        data['label'] = label
+        data['velodyne'] = velodyne
+
+        return data
 
 
 def get_data_loaders(args) -> (DataLoader, DataLoader):
