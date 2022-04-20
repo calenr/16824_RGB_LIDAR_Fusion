@@ -5,6 +5,7 @@ import wandb
 from data_loader.data_loader import get_data_loaders
 from model.model import RgbLidarFusion
 from trainer.trainer import Trainer
+import multiprocessing
 
 
 SEED = 420
@@ -14,13 +15,13 @@ torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(SEED)
 
-if __name__ == '__main__':
+def get_args(arg_list=None):
     parser = argparse.ArgumentParser(description='Hell Yeah')
     # setup params
     parser.add_argument('--train_dir', type=str, default="data/train")
     parser.add_argument('--val_dir', type=str, default="data/val")
     parser.add_argument('--device', type=str, default="cuda")
-    parser.add_argument('--num_data_loader_workers', type=int, default=10)
+    parser.add_argument('--num_data_loader_workers', type=int, default=multiprocessing.cpu_count())
     # monitor params
     parser.add_argument('--load_checkpoint', type=bool, default=False)
     parser.add_argument('--checkpoint_path', type=str, default="results/best.pth")
@@ -38,8 +39,10 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--scheduler_step', type=int, default=20)
     parser.add_argument('--scheduler_gamma', type=float, default=0.1)
-    args = parser.parse_args()
+    args = parser.parse_args() if str is None else parser.parse_args(arg_list)
+    return args
 
+def main(args):
     if args.use_wandb:
         wandb.login()
         wandb.init(entity="16824_rgb_lidar_fusion", project="test",
@@ -62,3 +65,7 @@ if __name__ == '__main__':
     trainer.train()
 
     wandb.finish()
+
+if __name__ == '__main__':
+    args = get_args()
+    main(args)
