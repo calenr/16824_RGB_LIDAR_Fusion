@@ -6,6 +6,13 @@ import os
 from os import path as osp
 from PIL import Image
 
+CLASSNAMES_TO_IDX = {
+    "Car": 0,
+    "Pedestrian": 1,
+    "Cyclist": 2
+}
+
+
 def get_transforms(args) -> (transforms.Compose, transforms.Compose):
     """
     :param args:
@@ -28,10 +35,11 @@ class KittiDataset(Dataset):
     """
     DataSet class to that holds and returns the KITTI data
     """
+
     # TODO
 
     def __init__(self, args, data_path: str, transform: transforms.Compose = None,
-                training:bool = True):
+                 training: bool = True):
         if transform is not None:
             self.transform = transform
         else:
@@ -67,7 +75,6 @@ class KittiDataset(Dataset):
 
         self.len = len(self.image_files)
 
-
     def __len__(self):
         return self.len
 
@@ -77,25 +84,34 @@ class KittiDataset(Dataset):
         image = Image.open(image_path).convert('RGB')
         image = self.transform(image)
 
+        label_list = []
+
         # Load Labels
         if self.training:
             label_path = osp.join(self.label_data_path, self.label_files[idx])
-            with open(label_path) as f:
-                label = f.readlines()
-            
-        else:
-            label = torch.zeros((1))
+            labels = [line.rstrip() for line in open(label_path)]
+            for label in labels:
+                data = label.split(' ')
+                data[1:] = [float(x) for x in data[1:]]
+                if data[0] in CLASSNAMES_TO_IDX.keys():
+                    data[0] = CLASSNAMES_TO_IDX[data[0]]
+                else:
+                    data[0] = len(CLASSNAMES_TO_IDX.items())
 
-        # TODO: Load velodyne data
-        # https://github.com/Qjizhi/kitti-velodyne-viewer
+                label_list.append(torch.Tensor(data))
+        else:
+            label_tensor = torch.zeros(1)
+
+        label_tensor = torch.stack(label_list)
+
         velo_path = osp.join(self.velodyne_data_path, self.velodyne_files[idx])
         velo_np = np.fromfile(velo_path, dtype=np.float32)
         velo_np = velo_np.reshape(-1, 4)
-        velo = torch.from_numpy(velo_np)
+        velo = torch.from_numpy(velo_np[:, 0:3])
 
         data = dict()
         data['image'] = image
-        data['label'] = label
+        data['label'] = label_tensor
         data['lidar'] = velo
 
         return data

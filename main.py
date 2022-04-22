@@ -1,4 +1,6 @@
 import argparse
+import os
+
 import torch
 import numpy as np
 import wandb
@@ -7,7 +9,6 @@ from model.model import RgbLidarFusion
 from trainer.trainer import Trainer
 import multiprocessing
 
-
 SEED = 420
 # Set the random seed manually for reproducibility.
 np.random.seed(SEED)
@@ -15,11 +16,12 @@ torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(SEED)
 
+
 def get_args(arg_list=None):
     parser = argparse.ArgumentParser(description='Hell Yeah')
     # setup params
-    parser.add_argument('--train_dir', type=str, default="data/train")
-    parser.add_argument('--val_dir', type=str, default="data/val")
+    parser.add_argument('--train_dir', type=str, default="data/dataset_small")
+    parser.add_argument('--val_dir', type=str, default="data/dataset_small")
     parser.add_argument('--device', type=str, default="cuda")
     parser.add_argument('--num_data_loader_workers', type=int, default=multiprocessing.cpu_count())
     # monitor params
@@ -30,7 +32,7 @@ def get_args(arg_list=None):
     parser.add_argument('--save_period', type=int, default=10)  # epoch
     parser.add_argument('--log_period', type=int, default=10)  # iteration
     parser.add_argument('--val_period', type=int, default=2)  # epoch
-    parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--use_wandb', type=bool, default=False)
     # data params
     parser.add_argument('--image_size', type=int, default=224)
     # training params
@@ -41,6 +43,7 @@ def get_args(arg_list=None):
     parser.add_argument('--scheduler_gamma', type=float, default=0.1)
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
     return args
+
 
 def main(args):
     if args.use_wandb:
@@ -65,6 +68,7 @@ def main(args):
     trainer.train()
 
     wandb.finish()
+
 
 if __name__ == '__main__':
     args = get_args()

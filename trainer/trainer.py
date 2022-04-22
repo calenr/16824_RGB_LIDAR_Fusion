@@ -20,8 +20,8 @@ class Trainer:
         self.args = args
 
         self.start_epoch = 1
-        self.train_step = 0
-        self.val_step = 0
+        self.train_step = 1
+        self.val_step = 1
 
         self.best_val_map = 0
         self.is_best = False
@@ -62,17 +62,18 @@ class Trainer:
         self.model.train()
         for batch_idx, batch_data in enumerate(self.train_loader):
             self.train_step += 1
-            data, target = batch_data
-            data, target = data.to(self.args.device), target.to(self.args.device)
+            image = batch_data['image'].to(self.args.device)
+            label = batch_data['label'].to(self.args.device)
+            velodyne = batch_data['velodyne'].to(self.args.device)
 
             self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = self.criterion(output, data)
+            output = self.model(image)
+            loss = self.criterion(output, label)
             loss.backward()
             self.optimizer.step()
 
             if self.train_step % self.args.log_period == 0:
-                train_map = calc_map(output, target)
+                train_map = calc_map(output, label)
                 print(f"epoch: {epoch}, batch_idx: {batch_idx}, train_loss: {loss}, train_map: {train_map}")
                 wandb.log({"train/loss": loss.item(),
                            "train/map": train_map.item(),
