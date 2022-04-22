@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+import numpy as np
 import os
 from os import path as osp
 from PIL import Image
@@ -81,17 +82,21 @@ class KittiDataset(Dataset):
             label_path = osp.join(self.label_data_path, self.label_files[idx])
             with open(label_path) as f:
                 label = f.readlines()
+            
         else:
             label = torch.zeros((1))
 
         # TODO: Load velodyne data
         # https://github.com/Qjizhi/kitti-velodyne-viewer
-        velodyne = torch.zeros((1))
+        velo_path = osp.join(self.velodyne_data_path, self.velodyne_files[idx])
+        velo_np = np.fromfile(velo_path, dtype=np.float32)
+        velo_np = velo_np.reshape(-1, 4)
+        velo = torch.from_numpy(velo_np)
 
         data = dict()
         data['image'] = image
         data['label'] = label
-        data['velodyne'] = velodyne
+        data['lidar'] = velo
 
         return data
 
