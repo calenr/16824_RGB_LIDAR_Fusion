@@ -8,6 +8,8 @@ def get_voxel_gen(vsize_xyz: list[float] = [0.16, 0.16, 4.0],
                   max_num_voxels: int = 20000,
                   max_num_points_per_voxel: int = 5):
     """
+    returns voxel generator, use it by calling .point_to_voxel(pointcloud), which returns
+    voxels (voxelized pointcloud data), indices (indices of which voxel a point belongs to), num_points
     :param vsize_xyz: voxel size in x,y,z e.g. [0.16, 0.16, 4.0]
     :param coors_range_xyz: point cloud range values [xmin, ymin, zmin, xmax, ymax, zmax]
     :param num_point_features: dimension of the pointcloud data, 4 if xyzr, 3 if xyz
@@ -216,3 +218,14 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
 
 if __name__ == '__main__':
     test = PillarFeatureNet()
+
+    voxel_generator = get_voxel_gen(
+        vsize_xyz=[0.1, 0.1, 5.0], coors_range_xyz=[-10.0, -10.0, -10.0, 10.0, 10.0, 10.0], num_point_features=4,
+        max_num_voxels=20000, max_num_points_per_voxel=5
+    )
+    # dummy pointcloud xyz between -10 and 10
+    lidar_xyz = torch.rand(size=[1000, 3]) * 20 - 10
+    # dummy pointcloud reflectance between -1 and 1
+    lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
+    lidar = torch.cat((lidar_xyz, lidar_r), dim=0)
+    pass
