@@ -166,12 +166,12 @@ class PillarFeatureNet(nn.Module):
         f_center = torch.zeros_like(features[:, :, :2])
         # Calculate Xp, x offset from pillar center
         f_center[:, :, 0] = features[:, :, 0] - (
-                indices[:, 2].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
-                # coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
+            indices[:, 2].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
+        # coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
         # Calculate Yp, y offset from pillar center
         f_center[:, :, 1] = features[:, :, 1] - (
-                indices[:, 1].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
-                # coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
+            indices[:, 1].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
+        # coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
 
         # Combine together feature decorations
         features_ls = [features, f_cluster, f_center]
@@ -186,7 +186,8 @@ class PillarFeatureNet(nn.Module):
         # The feature decorations were calculated without regard to whether pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
         voxel_count = features.shape[1]
-        mask = get_paddings_indicator(num_points_per_voxel, voxel_count, axis=0)
+        mask = get_paddings_indicator(
+            num_points_per_voxel, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(features)
         features *= mask
 
@@ -250,13 +251,14 @@ class PointPillarsPseudoImage(nn.Module):
         for batch_itt in range(self.batch_size):
             # Create the canvas for this sample
             canvas = torch.zeros((self.nchannels, self.nx * self.ny),
-                                  dtype=voxel_features.dtype,
-                                  device=voxel_features.device)
+                                 dtype=voxel_features.dtype,
+                                 device=voxel_features.device)
 
             # Only include non-empty pillars
             batch_mask = batched_indices[:, 0] == batch_itt
             this_batched_indices = batched_indices[batch_mask, :]
-            indices = this_batched_indices[:, 2] * self.nx + this_batched_indices[:, 3]
+            indices = this_batched_indices[:, 2] * \
+                self.nx + this_batched_indices[:, 3]
             indices = indices.type(torch.long)
             voxels = voxel_features[batch_mask, :]
             voxels = voxels.t()
@@ -276,11 +278,10 @@ class PointPillarsPseudoImage(nn.Module):
         return batch_canvas
 
 
-
 if __name__ == '__main__':
     device = torch.device("cuda")
 
-    ### 
+    ###
     # print("Sparse lidar example")
     # voxel_size = [0.1, 0.1, 5.0]
     # coors_range = [-10.0, -10.0, -10.0, 10.0, 10.0, 10.0]
@@ -318,13 +319,18 @@ if __name__ == '__main__':
     lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
     voxels, indices, num_points_per_voxel = voxel_generator(lidar)
 
-    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
-    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
-    print(f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
-    print(f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
-    print(f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
+    print(
+        f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
+    print(
+        f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
+    print(
+        f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
+    print(
+        f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
+    print(
+        f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
 
-    ### Forward pass the model
+    # Forward pass the model
     pillar_net = PillarFeatureNet(
         num_input_features=num_point_features,
         use_norm=True,
@@ -338,7 +344,7 @@ if __name__ == '__main__':
 
     print(f"pointcloud embedding output shape: {single_pc_output.shape}")
 
-    ### Create pseudo-image
+    # Create pseudo-image
     batch_info = torch.full([indices.shape[0], 1], fill_value=0).to(device)
     indices_w_batch_info = torch.cat((batch_info, indices), dim=1)
 
@@ -354,6 +360,7 @@ if __name__ == '__main__':
         output_shape=(1, pc_embedding_sizes[-1], grid_size[1], grid_size[2])
     ).to(device)
 
-    pseudo_images = pseudoimage_net(batched_outputs, batched_indices_w_batch_info)
+    pseudo_images = pseudoimage_net(
+        batched_outputs, batched_indices_w_batch_info)
 
     print(f"pseudo-image output shape: {pseudo_images.shape}")
