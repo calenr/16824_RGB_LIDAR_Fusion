@@ -9,15 +9,18 @@ def get_voxel_gen(vsize_xyz: list[float] = [0.16, 0.16, 4.0],
                   max_num_voxels: int = 20000, max_num_points_per_voxel: int = 5,
                   device: torch.device = torch.device("cuda")):
     """
-    returns voxel generator, use it by calling .point_to_voxel(pointcloud), which returns
-    voxels (voxelized pointcloud data), indices (indices of which voxel a point belongs to), num_points
+    returns voxel generator, use it by calling the forward function
+    :input pointcloud: unstructed pointcloud of shape (N, num_point_features), ordering is XYZR
+    :return voxels: voxelized pointcloud data. shape: (num_voxel, max_num_points_per_voxel, num_point_features)
+    :return indices: indices of which voxel a point belongs to. shape: (num_voxel, 3), ordering is ZYX
+    :return num_points: number of points that are inside each voxel. shape: (num_voxel)
+
     :param vsize_xyz: voxel size in x,y,z e.g. [0.16, 0.16, 4.0]
     :param coors_range_xyz: point cloud range values [xmin, ymin, zmin, xmax, ymax, zmax]
     :param num_point_features: dimension of the pointcloud data, 4 if xyzr, 3 if xyz
     :param max_num_voxels:
     :param max_num_points_per_voxel:
     :param device:
-    :return:
     """
     return PointToVoxel(
         vsize_xyz=vsize_xyz, coors_range_xyz=coors_range_xyz,
@@ -223,6 +226,7 @@ if __name__ == '__main__':
 
     test = PillarFeatureNet()
 
+    print("Sparse lidar example")
     voxel_generator = get_voxel_gen(
         vsize_xyz=[0.1, 0.1, 5.0], coors_range_xyz=[-10.0, -10.0, -10.0, 10.0, 10.0, 10.0], num_point_features=4,
         max_num_voxels=20000, max_num_points_per_voxel=5, device=device
@@ -231,5 +235,24 @@ if __name__ == '__main__':
     lidar_xyz = torch.rand(size=[1000, 3]) * 20 - 10
     # dummy pointcloud reflectance between -1 and 1
     lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
-    lidar = torch.cat((lidar_xyz, lidar_r), dim=0)
-    pass
+    lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
+    voxels, indices, num_points = voxel_generator(lidar)
+
+    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points.shape}")
+    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points[0]}")
+
+
+    print("Dense lidar example")
+    voxel_generator = get_voxel_gen(
+        vsize_xyz=[0.5, 0.5, 2.0], coors_range_xyz=[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0], num_point_features=4,
+        max_num_voxels=20000, max_num_points_per_voxel=5, device=device
+    )
+    # dummy pointcloud xyz between -10 and 10
+    lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
+    # dummy pointcloud reflectance between -1 and 1
+    lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
+    lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
+    voxels, indices, num_points = voxel_generator(lidar)
+
+    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points.shape}")
+    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points[0]}")
