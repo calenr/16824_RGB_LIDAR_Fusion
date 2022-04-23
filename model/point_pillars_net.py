@@ -145,20 +145,19 @@ class PillarFeatureNet(nn.Module):
         self.x_offset = self.vx / 2 + pc_range[0]
         self.y_offset = self.vy / 2 + pc_range[1]
 
-    def forward(self, features, num_voxels, coors):
+    def forward(self, features: torch.Tensor, indices: torch.Tensor, num_points_per_voxel: torch.Tensor) -> torch.Tensor:
         """
-        TODO: what are these??
-        :param features: My guess is that it is pointcloud [batch, Num of pts, 4] (x, y, z, r)
-        :param num_voxels: [num_voxels]
-        :param coors: [num_voxels, 4], my guess is that it is YX btm left and YX top right coordinates of
-        the pillar that a particular point belongs to
-        :return:
+        :param features: voxelized pointcloud (num_voxel, max_num_points_per_voxel, 4) (x, y, z, r)
+        :param indices: (num_voxels, 3), the index of pillar that the points belong to, ZYX ordering
+        :param num_points_per_voxel: (num_voxels), the actual number of points in each voxel, because of 0 padding
+        :return: embedding tensor: (num_voxel, num_filters[-1])
         """
 
         dtype = features.dtype
-        # Find distance of x, y, and z from cluster center
+
+        # Find the average xyz per voxel
         points_mean = features[:, :, :3].sum(
-            dim=1, keepdim=True) / num_voxels.type_as(features).view(-1, 1, 1)
+            dim=1, keepdim=True) / num_points_per_voxel.type_as(features).unsqueeze(1).unsqueeze(1)
         # Calculate Xc, Yc, Zc, offset from arithmetic mean
         f_cluster = features[:, :, :3] - points_mean
 
@@ -166,10 +165,12 @@ class PillarFeatureNet(nn.Module):
         f_center = torch.zeros_like(features[:, :, :2])
         # Calculate Xp, x offset from pillar center
         f_center[:, :, 0] = features[:, :, 0] - (
-                coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
+                indices[:, 2].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
+                # coors[:, 3].to(dtype).unsqueeze(1) * self.vx + self.x_offset)
         # Calculate Yp, y offset from pillar center
         f_center[:, :, 1] = features[:, :, 1] - (
-                coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
+                indices[:, 1].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
+                # coors[:, 2].to(dtype).unsqueeze(1) * self.vy + self.y_offset)
 
         # Combine together feature decorations
         features_ls = [features, f_cluster, f_center]
@@ -177,15 +178,14 @@ class PillarFeatureNet(nn.Module):
             points_dist = torch.norm(features[:, :, :3], 2, 2, keepdim=True)
             features_ls.append(points_dist)
 
-        # My guess of shape is
-        # [batch, num_pts, N=, D=9]
-        # [batch, num_voxels, max_num_points_per_voxel, 7]?????
+        # After augmentation, the shape is now
+        # [num_voxel, max_num_points_per_voxel, 9] (x, y, z, r, xc, yc, zc, xp, yp)
         features = torch.cat(features_ls, dim=-1)
 
         # The feature decorations were calculated without regard to whether pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
         voxel_count = features.shape[1]
-        mask = get_paddings_indicator(num_voxels, voxel_count, axis=0)
+        mask = get_paddings_indicator(num_points_per_voxel, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(features)
         features *= mask
 
@@ -193,66 +193,85 @@ class PillarFeatureNet(nn.Module):
         for pfn in self.pfn_layers:
             features = pfn(features)
 
-        # output should be (C, P) shape here
+        # output shape is [num_voxel, embedding feature size]
+        # embedding size is the last number of num_filters
         return features.squeeze()
 
 
-def get_paddings_indicator(actual_num, max_num, axis=0):
-    """Create boolean mask by actually number of a padded tensor.
-
-    Args:
-        actual_num ([type]): [description]
-        max_num ([type]): [description]
-
-    Returns:
-        [type]: [description]
+def get_paddings_indicator(actual_num: torch.Tensor, max_num: int, axis=0):
+    """
+    Create boolean mask to zero the padding points.
+    :param actual_num: the actual number of points in each voxel
+    :param max_num: int, the max_num_points_per_voxel
+    :return: boolean mask: ()
     """
 
     actual_num = torch.unsqueeze(actual_num, axis + 1)
-    # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
     max_num = torch.arange(
         max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
-    # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
-    # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
-    # paddings_indicator shape: [batch_size, max_num]
     return paddings_indicator
 
 
 if __name__ == '__main__':
     device = torch.device("cuda")
 
-    test = PillarFeatureNet()
-
+    ### 
     print("Sparse lidar example")
+    voxel_size = [0.1, 0.1, 5.0]
+    coors_range = [-10.0, -10.0, -10.0, 10.0, 10.0, 10.0]
+    num_point_features = 4
+    max_num_points_per_voxel = 5
+
     voxel_generator = get_voxel_gen(
-        vsize_xyz=[0.1, 0.1, 5.0], coors_range_xyz=[-10.0, -10.0, -10.0, 10.0, 10.0, 10.0], num_point_features=4,
-        max_num_voxels=20000, max_num_points_per_voxel=5, device=device
+        vsize_xyz=voxel_size, coors_range_xyz=coors_range, num_point_features=num_point_features,
+        max_num_voxels=20000, max_num_points_per_voxel=max_num_points_per_voxel, device=device
     )
     # dummy pointcloud xyz between -10 and 10
     lidar_xyz = torch.rand(size=[1000, 3]) * 20 - 10
     # dummy pointcloud reflectance between -1 and 1
     lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
     lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
-    voxels, indices, num_points = voxel_generator(lidar)
+    voxels, indices, num_points_per_voxel = voxel_generator(lidar)
 
-    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points.shape}")
-    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points[0]}")
+    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
+    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
 
+    ###
+    # print("Dense lidar example")
+    # voxel_size = [0.5, 0.5, 2.0]
+    # coors_range = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
+    # num_point_features = 4
+    # max_num_points_per_voxel = 5
 
-    print("Dense lidar example")
-    voxel_generator = get_voxel_gen(
-        vsize_xyz=[0.5, 0.5, 2.0], coors_range_xyz=[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0], num_point_features=4,
-        max_num_voxels=20000, max_num_points_per_voxel=5, device=device
+    # voxel_generator = get_voxel_gen(
+    #     vsize_xyz=voxel_size, coors_range_xyz=coors_range, num_point_features=num_point_features,
+    #     max_num_voxels=20000, max_num_points_per_voxel=max_num_points_per_voxel, device=device
+    # )
+    # # dummy pointcloud xyz between -10 and 10
+    # lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
+    # # dummy pointcloud reflectance between -1 and 1
+    # lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
+    # lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
+    # voxels, indices, num_points_per_voxel = voxel_generator(lidar)
+
+    # print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
+    # print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
+
+    ### Forward pass the model
+    model = PillarFeatureNet(
+        num_input_features=num_point_features,
+        use_norm=True,
+        num_filters=(64,),
+        with_distance=False,
+        voxel_size=voxel_size,
+        pc_range=coors_range
     )
-    # dummy pointcloud xyz between -10 and 10
-    lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
-    # dummy pointcloud reflectance between -1 and 1
-    lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
-    lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
-    voxels, indices, num_points = voxel_generator(lidar)
 
-    print(f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points.shape}")
-    print(f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points[0]}")
+    model = model.to(device)
+
+    output = model(voxels, indices, num_points_per_voxel)
+
+    print(f"output shape: {output.shape}")
