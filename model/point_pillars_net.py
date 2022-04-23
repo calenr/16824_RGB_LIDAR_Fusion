@@ -6,9 +6,10 @@ from spconv.pytorch.utils import PointToVoxel
 
 
 def get_voxel_gen(vsize_xyz: list[float] = [0.16, 0.16, 4.0],
-                  coors_range_xyz: list[float] = [0, -32.0, -3, 52.8, 32.0, 1], num_point_features: int = 4,
-                  max_num_voxels: int = 20000, max_num_points_per_voxel: int = 5,
-                  device: torch.device = torch.device("cuda")):
+                  coors_range_xyz: list[float] = [0, -40, -3, 70.4, 40, 1], num_point_features: int = 4,
+                  max_num_voxels: int = 12000, max_num_points_per_voxel: int = 100,
+                  device: torch.device = torch.device("cuda")
+                  ):
     """
     returns voxel generator, use it by calling the forward function
     :input pointcloud: unstructed pointcloud of shape (N, num_point_features), ordering is XYZR
@@ -47,7 +48,8 @@ class PFNLayer(nn.Module):
                  in_channels,
                  out_channels,
                  use_norm=True,
-                 last_layer=False):
+                 last_layer=False
+                 ):
         """
         Pillar Feature Net Layer.
         The Pillar Feature Net could be composed of a series of these layers, but the PointPillars paper results only
@@ -94,10 +96,11 @@ class PillarFeatureNet(nn.Module):
     def __init__(self,
                  num_input_features=4,
                  use_norm=True,
-                 num_filters=(64, 128, 256,),
+                 num_filters=(64,),
                  with_distance=False,
-                 voxel_size=(0.2, 0.2, 4),
-                 pc_range=(0, -40, -3, 70.4, 40, 1)):
+                 voxel_size=(0.16, 0.16, 4),
+                 pc_range=(0, -40, -3, 70.4, 40, 1)
+                 ):
         """
         Pillar Feature Net.
         The network prepares the pillar features and performs forward pass through PFNLayers.
@@ -278,6 +281,80 @@ class PointPillarsPseudoImage(nn.Module):
         return batch_canvas
 
 
+class PointCloudEncoder(nn.Module):
+    def __init__(self,
+                 num_input_features=4,
+                 use_norm=True,
+                 num_filters=(64,),
+                 with_distance=False,
+                 voxel_size=(0.16, 0.16, 4),
+                 pc_range=(0, -40, -3, 70.4, 40, 1),
+                 max_num_voxels=12000,
+                 max_num_points_per_voxel=100,
+                 batch_size=2,
+                 device=torch.device("cuda")
+                 ):
+        super().__init__()
+
+        # Converts single frame pointcloud (L, 4) to
+        self.voxel_generator = get_voxel_gen(
+            vsize_xyz=voxel_size,
+            coors_range_xyz=pc_range,
+            num_point_features=num_input_features,
+            max_num_voxels=max_num_voxels,
+            max_num_points_per_voxel=max_num_points_per_voxel,
+            device=device
+        )
+
+        # Converts single frame voxels (P, N, 3) to 2D learned feat (P, C)
+        self.pillar_feat_net = PillarFeatureNet(
+            num_input_features=num_input_features,
+            use_norm=use_norm,
+            num_filters=num_filters,
+            with_distance=with_distance,
+            voxel_size=voxel_size,
+            pc_range=pc_range
+        ).to(device)
+
+        self.grid_size = self.voxel_generator.grid_size
+        self.batch_size = batch_size
+
+        # Converts batch 2D learned feat (B, P, C) to batch pseudo-images (B, C, H, W)
+        self.pseudoimage_net = PointPillarsPseudoImage(
+            output_shape=(
+                self.batch_size, num_filters[-1], self.grid_size[1], self.grid_size[2])
+        ).to(device)
+
+    def forward(self, pointcloud_list: list[torch.Tensor]) -> torch.Tensor:
+        """
+        :param pointcloud_list: list of (num_points x 4) for xyzr of length batch_size
+        :return pseudo-images: (batch_size, num_filters[-1], grid_size_y, grid_size_x)
+        """
+
+        assert len(pointcloud_list) == self.batch_size
+
+        learned_feat_list = []
+        indices_batch_list = []
+        for batch_id, pointcloud in enumerate(pointcloud_list):
+            voxels, indices, num_points_per_voxel = self.voxel_generator(
+                pointcloud)
+            learned_feat = self.pillar_feat_net(
+                voxels, indices, num_points_per_voxel)
+            learned_feat_list.append(learned_feat)
+
+            batch_info = torch.full(
+                [indices.shape[0], 1], fill_value=batch_id).to(device)
+            indices_w_batch_info = torch.cat((batch_info, indices), dim=1)
+            indices_batch_list.append(indices_w_batch_info)
+
+        learned_feats = torch.cat(learned_feat_list, dim=0)
+        indices_batches = torch.cat(indices_batch_list, dim=0)
+
+        pseudo_images = self.pseudoimage_net(learned_feats, indices_batches)
+
+        return pseudo_images
+
+
 if __name__ == '__main__':
     device = torch.device("cuda")
 
@@ -302,65 +379,33 @@ if __name__ == '__main__':
     ###
     print("Dense lidar example")
     voxel_size = [0.5, 0.5, 2.0]
-    coors_range = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
-    num_point_features = 4
-    max_num_points_per_voxel = 5
-    pc_embedding_sizes = (64, )
+    pc_range = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
+  
+    batch_size = 5
+    input_data = []
+    for i in range(batch_size):
+        # dummy pointcloud xyz between -10 and 10
+        lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
+        # dummy pointcloud reflectance between -1 and 1
+        lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
+        lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
+        input_data.append(lidar)
 
-    voxel_generator = get_voxel_gen(
-        vsize_xyz=voxel_size, coors_range_xyz=coors_range, num_point_features=num_point_features,
-        max_num_voxels=20000, max_num_points_per_voxel=max_num_points_per_voxel, device=device
-    )
+    # voxels, indices, num_points_per_voxel = voxel_generator(lidar)
 
-    # dummy pointcloud xyz between -10 and 10
-    lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
-    # dummy pointcloud reflectance between -1 and 1
-    lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
-    lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
-    voxels, indices, num_points_per_voxel = voxel_generator(lidar)
+    # print(
+    #     f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
+    # print(
+    #     f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
+    # print(
+    #     f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
+    # print(
+    #     f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
+    # print(
+    #     f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
 
-    print(
-        f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
-    print(
-        f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
-    print(
-        f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
-    print(
-        f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
-    print(
-        f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
+    pc_enc = PointCloudEncoder(voxel_size=voxel_size, pc_range=pc_range, batch_size=len(input_data))
 
-    # Forward pass the model
-    pillar_net = PillarFeatureNet(
-        num_input_features=num_point_features,
-        use_norm=True,
-        num_filters=pc_embedding_sizes,
-        with_distance=False,
-        voxel_size=voxel_size,
-        pc_range=coors_range
-    ).to(device)
+    out = pc_enc(input_data)
 
-    single_pc_output = pillar_net(voxels, indices, num_points_per_voxel)
-
-    print(f"pointcloud embedding output shape: {single_pc_output.shape}")
-
-    # Create pseudo-image
-    batch_info = torch.full([indices.shape[0], 1], fill_value=0).to(device)
-    indices_w_batch_info = torch.cat((batch_info, indices), dim=1)
-
-    # if batch_size > 1, we concatenate them along dim = 0, i.e. make the tesor
-    # tall and skinny
-    batched_outputs = single_pc_output
-    batched_indices_w_batch_info = indices_w_batch_info
-
-    # number of voxel grids, in ZYX format
-    grid_size = voxel_generator.grid_size
-
-    pseudoimage_net = PointPillarsPseudoImage(
-        output_shape=(1, pc_embedding_sizes[-1], grid_size[1], grid_size[2])
-    ).to(device)
-
-    pseudo_images = pseudoimage_net(
-        batched_outputs, batched_indices_w_batch_info)
-
-    print(f"pseudo-image output shape: {pseudo_images.shape}")
+    print(out.shape)
