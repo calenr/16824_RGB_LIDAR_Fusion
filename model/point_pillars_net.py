@@ -37,7 +37,7 @@ class Passthrough(nn.Module):
     """
 
     def __init__(self):
-        super().__init__()
+        super(Passthrough, self).__init__()
 
     def forward(self, x):
         return x
@@ -60,8 +60,7 @@ class PFNLayer(nn.Module):
         :param last_layer: <bool>. If last_layer, there is no concatenation of features.
         """
 
-        super().__init__()
-        self.name = 'PFNLayer'
+        super(PFNLayer, self).__init__()
         self.last_vfe = last_layer
         if not self.last_vfe:
             out_channels = out_channels // 2
@@ -112,8 +111,7 @@ class PillarFeatureNet(nn.Module):
         :param pc_range: (<float>: 6). Point cloud range, only utilize x and y min.
         """
 
-        super().__init__()
-        self.name = 'PillarFeatureNet'
+        super(PillarFeatureNet, self).__init__()
         assert len(num_filters) > 0
         num_input_features += 5
         if with_distance:
@@ -228,7 +226,7 @@ class PointPillarsPseudoImage(nn.Module):
         :param num_input_features: <int>. Number of input embedding features.
         """
 
-        super().__init__()
+        super(PointPillarsPseudoImage, self).__init__()
         self.name = 'PointPillarsPseudoImage'
         self.output_shape = output_shape
 
@@ -294,7 +292,7 @@ class PointCloudEncoder(nn.Module):
                  batch_size=2,
                  device=torch.device("cuda")
                  ):
-        super().__init__()
+        super(PointCloudEncoder, self).__init__()
 
         # Converts single frame pointcloud (L, 4) to
         self.voxel_generator = get_voxel_gen(
@@ -325,6 +323,8 @@ class PointCloudEncoder(nn.Module):
                 self.batch_size, num_filters[-1], self.grid_size[1], self.grid_size[2])
         ).to(device)
 
+        self.device = device
+
     def forward(self, pointcloud_list: list[torch.Tensor]) -> torch.Tensor:
         """
         :param pointcloud_list: list of (num_points x 4) for xyzr of length batch_size
@@ -337,13 +337,13 @@ class PointCloudEncoder(nn.Module):
         indices_batch_list = []
         for batch_id, pointcloud in enumerate(pointcloud_list):
             voxels, indices, num_points_per_voxel = self.voxel_generator(
-                pointcloud)
+                pointcloud.to(self.device))
             learned_feat = self.pillar_feat_net(
                 voxels, indices, num_points_per_voxel)
             learned_feat_list.append(learned_feat)
 
             batch_info = torch.full(
-                [indices.shape[0], 1], fill_value=batch_id).to(device)
+                [indices.shape[0], 1], fill_value=batch_id).to(self.device)
             indices_w_batch_info = torch.cat((batch_info, indices), dim=1)
             indices_batch_list.append(indices_w_batch_info)
 

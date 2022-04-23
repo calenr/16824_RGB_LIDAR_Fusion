@@ -22,7 +22,7 @@ def get_args(arg_list=None):
     # setup params
     parser.add_argument('--train_dir', type=str, default="data/dataset_small")
     parser.add_argument('--val_dir', type=str, default="data/dataset_small")
-    parser.add_argument('--device', type=str, default="cuda")
+    parser.add_argument('--device', default=torch.device("cuda"))
     parser.add_argument('--num_data_loader_workers', type=int, default=multiprocessing.cpu_count())
     # monitor params
     parser.add_argument('--load_checkpoint', type=bool, default=False)
@@ -41,6 +41,15 @@ def get_args(arg_list=None):
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--scheduler_step', type=int, default=20)
     parser.add_argument('--scheduler_gamma', type=float, default=0.1)
+    # Pointcloud encoder params
+    parser.add_argument('--pc_num_input_features', type=int, default=4)
+    parser.add_argument('--pc_use_norm', type=bool, default=True)
+    parser.add_argument('--pc_num_filters', type=list[int], default=[64, 128, 256])
+    parser.add_argument('--pc_with_distance', type=bool, default=False)
+    parser.add_argument('--pc_voxel_size', type=list[float], default=[0.16, 0.16, 4])
+    parser.add_argument('--pc_range', type=list[float], default=[0, -40, -3, 70.4, 40, 1])
+    parser.add_argument('--pc_max_num_voxels', type=int, default=12000)
+    parser.add_argument('--pc_max_num_points_per_voxel', type=int, default=100)
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
     return args
 

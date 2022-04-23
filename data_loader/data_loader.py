@@ -12,8 +12,23 @@ CLASSNAMES_TO_IDX = {
     "Cyclist": 2
 }
 
+def collate_fn(batch):
+    image = [item['image'] for item in batch]
+    label = [item['label'] for item in batch]
+    lidar = [item['lidar'] for item in batch]
 
-def get_transforms(args) -> (transforms.Compose, transforms.Compose):
+    image = torch.stack(image)
+    label = torch.stack(label)
+
+    data = dict()
+    data['image'] = image
+    data['label'] = label
+    data['lidar'] = lidar
+    
+    return data
+
+
+def get_transforms(args) -> tuple[transforms.Compose, transforms.Compose]:
     """
     :param args:
     :return: transform composition for train and val
@@ -107,7 +122,7 @@ class KittiDataset(Dataset):
         velo_path = osp.join(self.velodyne_data_path, self.velodyne_files[idx])
         velo_np = np.fromfile(velo_path, dtype=np.float32)
         velo_np = velo_np.reshape(-1, 4)
-        velo = torch.from_numpy(velo_np[:, 0:3])
+        velo = torch.from_numpy(velo_np)
 
         data = dict()
         data['image'] = image
@@ -117,7 +132,7 @@ class KittiDataset(Dataset):
         return data
 
 
-def get_data_loaders(args) -> (DataLoader, DataLoader):
+def get_data_loaders(args) -> tuple[DataLoader, DataLoader]:
     """
     :param args:
     :return: tuple of (train data loader, val data loader)
@@ -131,14 +146,16 @@ def get_data_loaders(args) -> (DataLoader, DataLoader):
                               batch_size=args.batch_size,
                               shuffle=True,
                               num_workers=args.num_data_loader_workers,
-                              drop_last=True
+                              drop_last=True,
+                              collate_fn=collate_fn,
                               )
 
     val_loader = DataLoader(dataset=val_dataset,
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=args.num_data_loader_workers,
-                            drop_last=True
+                            drop_last=True,
+                            collate_fn=collate_fn,
                             )
 
     return train_loader, val_loader
