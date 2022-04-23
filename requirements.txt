@@ -4,3 +4,4 @@ numpy
 tqdm
 tensorboard
 wandb
+spconv-cu102

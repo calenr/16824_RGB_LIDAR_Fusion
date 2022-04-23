@@ -64,10 +64,10 @@ class Trainer:
             self.train_step += 1
             image = batch_data['image'].to(self.args.device)
             label = batch_data['label'].to(self.args.device)
-            velodyne = batch_data['velodyne'].to(self.args.device)
+            lidar = batch_data['lidar'].to(self.args.device)
 
             self.optimizer.zero_grad()
-            output = self.model(image)
+            output = self.model(image, lidar)
             loss = self.criterion(output, label)
             loss.backward()
             self.optimizer.step()
