@@ -2,7 +2,12 @@
 
 ## Description
 
-## Requirements
+## Installation
+
+```commandline
+conda install scikit-image scipy numba pillow matplotlib
+pip install fire tensorboardX protobuf opencv-python spconv-cu102
+```
 
 ## Implementation
 
