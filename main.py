@@ -47,9 +47,10 @@ def get_args(arg_list=None):
     parser.add_argument('--pc_num_filters', type=list[int], default=[64, 128, 256])
     parser.add_argument('--pc_with_distance', type=bool, default=False)
     parser.add_argument('--pc_voxel_size', type=list[float], default=[0.16, 0.16, 4])
-    parser.add_argument('--pc_range', type=list[float], default=[0, -40, -3, 70.4, 40, 1])
+    parser.add_argument('--pc_range', type=list[float], default=[0, -30, -3, 60, 30, 1])
     parser.add_argument('--pc_max_num_voxels', type=int, default=12000)
     parser.add_argument('--pc_max_num_points_per_voxel', type=int, default=100)
+    parser.add_argument('--pc_grid_size', type=list[int])
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
     return args
 
@@ -69,7 +70,7 @@ def main(args):
 
     train_loader, val_loader = get_data_loaders(args)
     model = RgbLidarFusion(args).to(args.device)
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), args.lr, (0.0, 0.9))
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.scheduler_step, args.scheduler_gamma)
 

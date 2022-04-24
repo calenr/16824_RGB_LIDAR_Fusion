@@ -18,13 +18,12 @@ def collate_fn(batch):
     lidar = [item['lidar'] for item in batch]
 
     image = torch.stack(image)
-    label = torch.stack(label)
 
     data = dict()
     data['image'] = image
     data['label'] = label
     data['lidar'] = lidar
-    
+
     return data
 
 

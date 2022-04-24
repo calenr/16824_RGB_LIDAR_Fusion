@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torchvision.transforms import Resize
 from .image_encoder import ImgEncoder
 from .point_pillars_net import PointCloudEncoder
 
@@ -7,7 +8,7 @@ from .point_pillars_net import PointCloudEncoder
 class RgbLidarFusion(nn.Module):
     def __init__(self, args):
         super(RgbLidarFusion, self).__init__()
-
+        self.args = args
         self.img_enc = ImgEncoder()
         self.pc_enc = PointCloudEncoder(
             num_input_features=args.pc_num_input_features,
@@ -22,16 +23,82 @@ class RgbLidarFusion(nn.Module):
             device=args.device,
         )
 
+        args.pc_grid_size = self.pc_enc.voxel_generator.grid_size
+        self.image_resizer = Resize(args.pc_grid_size[1:3], antialias=True)
+
+        self.classifier_input_size = args.pc_num_filters[-1] + 256
+        self.out_size = 7
+
+        self.fused_feat_cnn = FusedFeatBackbone(self.classifier_input_size)
+        # Yolo classifier
+        self.classifier = ResBlock(self.classifier_input_size, self.out_size)
+
+
     def forward(self, image: torch.Tensor, lidar: list[torch.Tensor]) -> torch.Tensor:
         """
-        :param image: Batch x 3 x
-        :param lidar: Batch x N x 3
+        :param image: (Batch, 3, 375, 1242)
+        :param lidar: list of (N, 4), lenght of list must be equal to args.batch_size
         :return:
         """
+        assert len(lidar) == self.args.batch_size
+
+        # image feat is of shape (batch, 256, 24, 78)
         image_feat = self.img_enc(image)
+        # point feat is of shape (batch, num_filters[-1], grid_size_y, grid_size_x)
         point_feat = self.pc_enc(lidar)
+        # resized image feat is of shape (batch, 256, grid_size_y, grid_size_x)
+        image_feat = self.image_resizer(image_feat)
+        # fused feat is of shape (batch, num_filters[-1] + 256, grid_size_y, grid_size_x)
+        fused_feat = torch.cat((point_feat, image_feat), dim=1)
+        fused_feat = self.fused_feat_cnn(fused_feat)
+        out = self.classifier(fused_feat)
 
-        print(image_feat.shape)
-        print(point_feat.shape)
+        print(f"output shape: {out.shape}")
 
-        return image_feat
+        return out
+
+
+class ResBlock(nn.Module):
+    def __init__(self, input_channel: int, output_channel: int):
+        super(ResBlock, self).__init__()
+
+        self.downsample = nn.Sequential(
+            nn.Conv2d(input_channel, output_channel, 1, 2, bias=False),
+            nn.BatchNorm2d(output_channel),
+        )
+
+        self.layers = nn.Sequential(
+            nn.Conv2d(input_channel, output_channel, 3, 2, 1, bias=False),
+            nn.BatchNorm2d(output_channel),
+            nn.ReLU(True),
+            nn.Conv2d(output_channel, output_channel, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(output_channel),
+            nn.ReLU(True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        :param x: (batch, 512, grid_size_y, grid_size_x)
+        :return: 
+        """
+        return self.layers(x) + self.downsample(x)
+
+
+class FusedFeatBackbone(nn.Module):
+    def __init__(self, input_channel: int):
+        super(FusedFeatBackbone, self).__init__()
+
+        self.backbone = nn.Sequential(
+            ResBlock(input_channel, input_channel),
+            ResBlock(input_channel, input_channel),
+            ResBlock(input_channel, input_channel),
+            ResBlock(input_channel, input_channel),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        :param x: (batch, 512, grid_size_y, grid_size_x)
+        :return: 
+        """
+        x = self.backbone(x)
+        return x
