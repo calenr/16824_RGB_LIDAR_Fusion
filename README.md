@@ -7,8 +7,8 @@
 - Tested on Ubuntu 18.04 with RTX3070 and CUDA 11.3
 
 ```commandline
-conda install scikit-image scipy numba pillow matplotlib
-pip install fire tensorboardX protobuf opencv-python spconv-cu113
+conda install scikit-image scipy numba pillow matplotlib flask pyqtgraph pyopengl
+pip install fire tensorboardX protobuf opencv-python spconv-cu113 tqdm wandb
 ```
 
 ## Implementation
