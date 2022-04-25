@@ -294,7 +294,7 @@ class PointCloudEncoder(nn.Module):
                  ):
         super(PointCloudEncoder, self).__init__()
 
-        # Converts single frame pointcloud (L, 4) to
+        # Converts single frame pointcloud (L, 4) to voxels (P, N, 3)
         self.voxel_generator = get_voxel_gen(
             vsize_xyz=voxel_size,
             coors_range_xyz=pc_range,

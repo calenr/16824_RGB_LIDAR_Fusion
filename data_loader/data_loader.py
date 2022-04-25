@@ -40,6 +40,7 @@ def get_transforms(args) -> tuple[transforms.Compose, transforms.Compose]:
 
     train_tf = transforms.Compose([
         transforms.ToTensor(),
+        transforms.Resize((args.image_size, args.image_size), antialias=True)
     ])
 
     val_tf = transforms.Compose([

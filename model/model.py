@@ -3,7 +3,8 @@ import torch.nn as nn
 from torchvision.transforms import Resize
 from .image_encoder import ImgEncoder
 from .point_pillars_net import PointCloudEncoder
-
+from .detection_head import YoloHead
+from .resnet import FusedFeatBackbone
 
 class RgbLidarFusion(nn.Module):
     def __init__(self, args):
@@ -27,11 +28,9 @@ class RgbLidarFusion(nn.Module):
         self.image_resizer = Resize(args.pc_grid_size[1:3], antialias=True)
 
         self.classifier_input_size = args.pc_num_filters[-1] + 256
-        self.out_size = 7
 
         self.fused_feat_cnn = FusedFeatBackbone(self.classifier_input_size)
-        # Yolo classifier
-        self.classifier = ResBlock(self.classifier_input_size, self.out_size)
+        self.detection_head = YoloHead(1, 9, self.classifier_input_size)
 
 
     def forward(self, image: torch.Tensor, lidar: list[torch.Tensor]) -> torch.Tensor:
@@ -51,54 +50,8 @@ class RgbLidarFusion(nn.Module):
         # fused feat is of shape (batch, num_filters[-1] + 256, grid_size_y, grid_size_x)
         fused_feat = torch.cat((point_feat, image_feat), dim=1)
         fused_feat = self.fused_feat_cnn(fused_feat)
-        out = self.classifier(fused_feat)
+        out = self.detection_head(fused_feat)
 
         print(f"output shape: {out.shape}")
 
         return out
-
-
-class ResBlock(nn.Module):
-    def __init__(self, input_channel: int, output_channel: int):
-        super(ResBlock, self).__init__()
-
-        self.downsample = nn.Sequential(
-            nn.Conv2d(input_channel, output_channel, 1, 2, bias=False),
-            nn.BatchNorm2d(output_channel),
-        )
-
-        self.layers = nn.Sequential(
-            nn.Conv2d(input_channel, output_channel, 3, 2, 1, bias=False),
-            nn.BatchNorm2d(output_channel),
-            nn.ReLU(True),
-            nn.Conv2d(output_channel, output_channel, 3, 1, 1, bias=False),
-            nn.BatchNorm2d(output_channel),
-            nn.ReLU(True),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        :param x: (batch, 512, grid_size_y, grid_size_x)
-        :return: 
-        """
-        return self.layers(x) + self.downsample(x)
-
-
-class FusedFeatBackbone(nn.Module):
-    def __init__(self, input_channel: int):
-        super(FusedFeatBackbone, self).__init__()
-
-        self.backbone = nn.Sequential(
-            ResBlock(input_channel, input_channel),
-            ResBlock(input_channel, input_channel),
-            ResBlock(input_channel, input_channel),
-            ResBlock(input_channel, input_channel),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        :param x: (batch, 512, grid_size_y, grid_size_x)
-        :return: 
-        """
-        x = self.backbone(x)
-        return x
