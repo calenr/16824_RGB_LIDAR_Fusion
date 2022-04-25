@@ -71,7 +71,7 @@ class Trainer:
 
             self.optimizer.zero_grad()
             output = self.model(images, lidars)
-            loss = self.model.detection_head.calc_loss(output, labels, calibs)
+            loss = self.criterion(output, labels, calibs, self.args.pc_grid_size)
             loss.backward()
             self.optimizer.step()
 

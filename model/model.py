@@ -30,8 +30,7 @@ class RgbLidarFusion(nn.Module):
         self.classifier_input_size = args.pc_num_filters[-1] + 256
 
         self.fused_feat_cnn = FusedFeatBackbone(self.classifier_input_size)
-        self.detection_head = YoloHead(args, args.pc_range, args.pc_voxel_size, args.pc_grid_size, 
-                                       1, 9, self.classifier_input_size)
+        self.detection_head = YoloHead(args.yolo_num_box_per_cell, args.yolo_box_length, self.classifier_input_size)
 
 
     def forward(self, image: torch.Tensor, lidar: list[torch.Tensor]) -> torch.Tensor:
