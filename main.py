@@ -31,7 +31,7 @@ def get_args(arg_list=None):
     parser.add_argument('--save_model_checkpoint', type=bool, default=False)
     parser.add_argument('--save_period', type=int, default=10)  # epoch
     parser.add_argument('--log_period', type=int, default=10)  # iteration
-    parser.add_argument('--val_period', type=int, default=2)  # epoch
+    parser.add_argument('--val_period', type=int, default=2000)  # epoch
     parser.add_argument('--use_wandb', type=bool, default=False)
     # data params
     parser.add_argument('--image_size', type=int, default=448)

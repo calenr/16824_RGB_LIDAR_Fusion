@@ -6,6 +6,7 @@ from model.metric import calc_map
 import utils.utils
 import wandb
 from tqdm import tqdm
+from utils.kitti_viewer import draw_3d_output, draw_2d_output
 
 
 class Trainer:
@@ -62,18 +63,21 @@ class Trainer:
         self.model.train()
         for batch_idx, batch_data in enumerate(self.train_loader):
             self.train_step += 1
-            image = batch_data['image'].to(self.args.device)
-            label = batch_data['label'].to(self.args.device)
-            lidar = batch_data['lidar'].to(self.args.device)
+            images = batch_data['image'].to(self.args.device)
+            labels = batch_data['label']
+            lidars = batch_data['lidar']
+            calibs = batch_data['calib']
+            # draw_3d_output(lidars[0].to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0])
 
             self.optimizer.zero_grad()
-            output = self.model(image, lidar)
-            loss = self.criterion(output, label)
+            output = self.model(images, lidars)
+            loss = self.model.detection_head.calc_loss(output, labels, calibs)
             loss.backward()
             self.optimizer.step()
 
             if self.train_step % self.args.log_period == 0:
-                train_map = calc_map(output, label)
+                # train_map = calc_map(output, label)
+                train_map = torch.zero(1)
                 print(f"epoch: {epoch}, batch_idx: {batch_idx}, train_loss: {loss}, train_map: {train_map}")
                 wandb.log({"train/loss": loss.item(),
                            "train/map": train_map.item(),
@@ -103,8 +107,10 @@ class Trainer:
         output_agg = torch.vstack(output_agg)
         target_agg = torch.vstack(target_agg)
 
-        val_map = calc_map(output_agg, target_agg)
-        val_loss = self.criterion(output_agg, target_agg)
+        # val_map = calc_map(output_agg, target_agg)
+        # val_loss = self.criterion(output_agg, target_agg)
+        val_map = torch.zero(1)
+        val_loss = torch.zero(1)
 
         if val_map > self.best_val_map:
             self.best_val_map = val_map
