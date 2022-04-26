@@ -359,53 +359,56 @@ if __name__ == '__main__':
     device = torch.device("cuda")
 
     ###
-    # print("Sparse lidar example")
-    # voxel_size = [0.1, 0.1, 5.0]
-    # coors_range = [-10.0, -10.0, -10.0, 10.0, 10.0, 10.0]
-    # num_point_features = 4
-    # max_num_points_per_voxel = 5
+    print("Sparse lidar example")
+    voxel_size = [0.16, 0.16, 4.0]
+    coors_range = [0, -40.0, -3.0, 80.0, 40.0, 1.0]
+    num_point_features = 4
+    max_num_points_per_voxel = 5
 
-    # voxel_generator = get_voxel_gen(
-    #     vsize_xyz=voxel_size, coors_range_xyz=coors_range, num_point_features=num_point_features,
-    #     max_num_voxels=20000, max_num_points_per_voxel=max_num_points_per_voxel, device=device
-    # )
-    # # dummy pointcloud xyz between -10 and 10
-    # lidar_xyz = torch.rand(size=[1000, 3]) * 20 - 10
-    # # dummy pointcloud reflectance between -1 and 1
-    # lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
-    # lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
-    # voxels, indices, num_points_per_voxel = voxel_generator(lidar)
+    voxel_generator = get_voxel_gen(
+        vsize_xyz=voxel_size, coors_range_xyz=coors_range, num_point_features=num_point_features,
+        max_num_voxels=20000, max_num_points_per_voxel=max_num_points_per_voxel, device=device
+    )
+    # dummy pointcloud xyz between -10 and 10
+    lidar_x = torch.rand(size=[5000, 1]) * 80
+    lidar_y = torch.rand(size=[5000, 1]) * 80 - 40
+    lidar_z = torch.rand(size=[5000, 1]) * 4 - 3
+    # dummy pointcloud reflectance between -1 and 1
+    lidar_r = torch.rand(size=[5000, 1]) * 2 - 1
+    lidar = torch.cat((lidar_x, lidar_y, lidar_z, lidar_r), dim=1).cuda()
+    voxels, indices, num_points_per_voxel = voxel_generator(lidar)
+    print(voxel_generator.grid_size)
 
     ###
-    print("Dense lidar example")
-    voxel_size = [0.5, 0.5, 2.0]
-    pc_range = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
+    # print("Dense lidar example")
+    # voxel_size = [0.5, 0.5, 2.0]
+    # pc_range = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]
   
-    batch_size = 5
-    input_data = []
-    for i in range(batch_size):
-        # dummy pointcloud xyz between -10 and 10
-        lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
-        # dummy pointcloud reflectance between -1 and 1
-        lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
-        lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
-        input_data.append(lidar)
+    # batch_size = 5
+    # input_data = []
+    # for i in range(batch_size):
+    #     # dummy pointcloud xyz between -10 and 10
+    #     lidar_xyz = torch.rand(size=[1000, 3]) * 2 - 1
+    #     # dummy pointcloud reflectance between -1 and 1
+    #     lidar_r = torch.rand(size=[1000, 1]) * 2 - 1
+    #     lidar = torch.cat((lidar_xyz, lidar_r), dim=1).cuda()
+    #     input_data.append(lidar)
 
     # voxels, indices, num_points_per_voxel = voxel_generator(lidar)
 
-    # print(
-    #     f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
-    # print(
-    #     f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
-    # print(
-    #     f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
-    # print(
-    #     f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
-    # print(
-    #     f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
+    print(
+        f"voxel shape: {voxels.shape} indices shape: {indices.shape} num_points shape: {num_points_per_voxel.shape}")
+    print(
+        f"voxel sample: \n {voxels[0]} \n indices sample: {indices[0]} \n num_points sample: {num_points_per_voxel[0]}")
+    print(
+        f"indices xmin: {torch.min(indices[:, 2])} indices xmax: {torch.max(indices[:, 2])}")
+    print(
+        f"indices ymin: {torch.min(indices[:, 1])} indices ymax: {torch.max(indices[:, 1])}")
+    print(
+        f"indices zmin: {torch.min(indices[:, 0])} indices zmax: {torch.max(indices[:, 0])}")
 
-    pc_enc = PointCloudEncoder(voxel_size=voxel_size, pc_range=pc_range, batch_size=len(input_data))
+    # pc_enc = PointCloudEncoder(voxel_size=voxel_size, pc_range=pc_range, batch_size=len(input_data))
 
-    out = pc_enc(input_data)
+    # out = pc_enc(input_data)
 
-    print(out.shape)
+    # print(out.shape)

@@ -41,7 +41,7 @@ YOLOLABEL_IDX = {
 class YoloLoss(nn.Module):
 
     def __init__(self, args, pc_range: list[float], voxel_size: list[int]=[0.16, 0.16, 4],
-                 num_box_per_cell: int=1, box_length: int=9):
+                 num_box_per_cell: int=1, box_length: int=9, anchors: list[float]=[1.56, 1.6, 3.9]):
         super(YoloLoss, self).__init__()
         self.box_length = box_length
         self.output_dim = num_box_per_cell * box_length
@@ -51,8 +51,14 @@ class YoloLoss(nn.Module):
         self.noobj_loss_weight = 0.5
         self.coor_loss_weight = 5
         self.voxel_size = voxel_size # XYZ
+        self.pc_range = pc_range # XYZ XYZ
+        self.x_range = pc_range[3] - pc_range[0]
+        self.y_range = pc_range[4] - pc_range[1]
+        self.z_range = pc_range[5] - pc_range[2]
         self.x_offset = pc_range[0]
         self.y_offset = pc_range[1]
+        self.z_offset = pc_range[2]
+        self.anchors = anchors
         self.device = args.device
 
     def forward(self, outputs: torch.Tensor, targets: list[torch.Tensor], calibs:list[Calibration], grid_size: list[int]):
@@ -73,6 +79,7 @@ class YoloLoss(nn.Module):
             target = targets[batch_id].to(self.device)
             calib = calibs[batch_id]
             output_grid_size = (output.shape[1], output.shape[2])  # YX
+            output_grid_len_m = (self.z_range, self.y_range / output.shape[1], self.x_range / output.shape[2])  # ZYX, in metres
             # Ratio of the final embedding grid size vs. the original voxelized grid size
             grid_ratios = (output.shape[1] / grid_size[1], output.shape[2] / grid_size[2])  # YX
 
@@ -105,8 +112,15 @@ class YoloLoss(nn.Module):
 
                 # Cells in the grid that has ground truth data is labelled true
                 obj_mask[yolo_target_yx_idx] = True
+
+                # print(yolo_target_velo)
+                yolo_norm_target = self.normalize_yolo_labels(yolo_target_velo, output_grid_len_m, yolo_target_yx_idx)
+                # print(yolo_norm_target)
+                yolo_norm_target = torch.transpose(yolo_norm_target, 0, 1)
+                # print("XXXXXXXXXXXXXXXXXXXXXXXX")
+
                 # Target info is copied to the one in grid format
-                target_in_grid[:, yolo_target_yx_idx[:, 0], yolo_target_yx_idx[:, 1]] = torch.transpose(yolo_target, 0, 1)
+                target_in_grid[:, yolo_target_yx_idx[:, 0], yolo_target_yx_idx[:, 1]] = yolo_norm_target
 
             # no object mask for the noobj loss
             noobj_mask = obj_mask.logical_not()
@@ -128,13 +142,37 @@ class YoloLoss(nn.Module):
         noobj_masks = torch.cat(noobj_masks)
 
         # Calculate the losses
-        obj_conf_loss = self.bce_loss(self.sigmoid(obj_masks * outputs_flatten[:, YOLOLABEL_IDX["conf"]]), obj_masks * targets_flatten[:, YOLOLABEL_IDX["conf"]])
-        noobj_conf_loss = self.bce_loss(self.sigmoid(noobj_masks * outputs_flatten[:, YOLOLABEL_IDX["conf"]]), noobj_masks * targets_flatten[:, YOLOLABEL_IDX["conf"]])
+        obj_conf_loss = self.mse_loss(obj_masks * outputs_flatten[:, YOLOLABEL_IDX["conf"]], obj_masks * targets_flatten[:, YOLOLABEL_IDX["conf"]])
+        noobj_conf_loss = self.mse_loss(noobj_masks * outputs_flatten[:, YOLOLABEL_IDX["conf"]], noobj_masks * targets_flatten[:, YOLOLABEL_IDX["conf"]])
         coord_loss = self.mse_loss(obj_masks * outputs_flatten[:, YOLOLABEL_IDX["x"]:YOLOLABEL_IDX["z"]+1], obj_masks * targets_flatten[:, YOLOLABEL_IDX["x"]:YOLOLABEL_IDX["z"]+1])
         shape_loss = self.mse_loss(obj_masks * outputs_flatten[:, YOLOLABEL_IDX["h"]:YOLOLABEL_IDX["l"]+1], obj_masks * targets_flatten[:, YOLOLABEL_IDX["h"]:YOLOLABEL_IDX["l"]+1])
         angle_loss = self.mse_loss(obj_masks * outputs_flatten[:, YOLOLABEL_IDX["yaw_r"]:YOLOLABEL_IDX["yaw_i"]+1], obj_masks * targets_flatten[:, YOLOLABEL_IDX["yaw_r"]:YOLOLABEL_IDX["yaw_i"]+1])
 
         return obj_conf_loss, self.noobj_loss_weight * noobj_conf_loss, self.coor_loss_weight * coord_loss, self.coor_loss_weight * shape_loss, self.coor_loss_weight * angle_loss
+
+    def normalize_yolo_labels(self, label: torch.Tensor, output_grid_len_m: list[float], yolo_target_yx_idx: torch.Tensor):
+        """
+        output_grid_len_m is in ZYX format
+        """
+
+        assert isinstance(label, torch.Tensor)
+        assert len(label.shape) == 2
+        assert label.shape[1] == self.box_length
+        assert len(output_grid_len_m) == 3
+
+        for id in range(label.shape[0]):
+
+            yx_idx = yolo_target_yx_idx[id]
+            yolo_label = label[id]
+
+            yolo_label[YOLOLABEL_IDX["x"]] = (yolo_label[YOLOLABEL_IDX["x"]] - self.x_offset - output_grid_len_m[2] * yx_idx[1]) / output_grid_len_m[2]
+            yolo_label[YOLOLABEL_IDX["y"]] = (yolo_label[YOLOLABEL_IDX["y"]] - self.y_offset - output_grid_len_m[1] * yx_idx[0]) / output_grid_len_m[1]
+            yolo_label[YOLOLABEL_IDX["z"]] = (yolo_label[YOLOLABEL_IDX["z"]] - self.z_offset) / output_grid_len_m[0]
+            yolo_label[YOLOLABEL_IDX["h"]] = (yolo_label[YOLOLABEL_IDX["h"]] - self.anchors[0]) / self.anchors[0] #/ self.z_range
+            yolo_label[YOLOLABEL_IDX["w"]] = (yolo_label[YOLOLABEL_IDX["w"]] - self.anchors[1]) / self.anchors[1] #/ self.y_range
+            yolo_label[YOLOLABEL_IDX["l"]] = (yolo_label[YOLOLABEL_IDX["l"]] - self.anchors[2]) / self.anchors[2] #/ self.x_range
+
+        return label
 
     def convert_label_kitti_to_yolo(self, label: torch.Tensor):
 
@@ -171,7 +209,7 @@ class YoloLoss(nn.Module):
 
         return yolo_labels
 
-    def convert_label_yolo_to_kitti(self, label: torch.Tensor):
+    def convert_label_norm_yolo_to_kitti(self, label: torch.Tensor):
         assert isinstance(label, torch.Tensor)
         assert len(label.shape) == 2
         assert label.shape[1] == self.box_length
