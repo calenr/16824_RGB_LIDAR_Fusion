@@ -159,7 +159,7 @@ def get_data_loaders(args) -> tuple[DataLoader, DataLoader]:
 
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=args.batch_size,
-                              shuffle=False,
+                              shuffle=True,
                               num_workers=args.num_data_loader_workers,
                               drop_last=True,
                               collate_fn=collate_fn,

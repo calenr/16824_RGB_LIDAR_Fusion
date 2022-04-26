@@ -52,7 +52,7 @@ class Trainer:
             self.train_epoch(epoch)
             # return
             self.scheduler.step()
-            
+
             if epoch % self.args.val_period == 0:
                 self.val_epoch(epoch)
 
@@ -73,18 +73,23 @@ class Trainer:
             labels = batch_data['label']
             lidars = batch_data['lidar']
             calibs = batch_data['calib']
-            # draw_3d_output(lidars[0].to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0])
 
             self.optimizer.zero_grad()
-            output = self.model(images, lidars)
-            # output = torch.reshape(output, (1, 9, -1))
-            # output = output[0]
-            # idx = output[0, :] > 0.5
-            # print(idx.shape)
-            # print(output[:, idx])
-            # return
-            obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(output, labels, calibs, self.args.pc_grid_size)
+            outputs = self.model(images, lidars)
+
+            # TODO clean up this messy inference code 
+            # output = torch.reshape(outputs[0], (-1, 9))
+            # idx = torch.sigmoid(output[:, 0]) > 0.7
+            # idx = idx.nonzero().squeeze()
+            # pred = output[idx, :]
+            # pred_kitti = self.criterion.convert_label_yolo_to_kitti(pred)
+            # print(pred_kitti.shape)
+            # print(labels[0].shape)
+            obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(outputs, labels, calibs, self.args.pc_grid_size)
             loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
+            # print(loss)
+            # draw_3d_output(lidars[0].to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0], pred_kitti.detach().to('cpu').numpy().tolist())
+            # return
             loss.backward()
             self.optimizer.step()
 

@@ -54,8 +54,8 @@ def get_args(arg_list=None):
     parser.add_argument('--pc_grid_size', type=list[int])
     # Yolo params
     # parser.add_argument('--yolo_anchors', type=list[list[float]], default=[[1.6, 3.9, 1.56]]) # w, l, h
-    parser.add_argument('--yolo_num_box_per_cell', type=int, default=1) # w, l, h
-    parser.add_argument('--yolo_box_length', type=int, default=9) # w, l, h
+    parser.add_argument('--yolo_num_box_per_cell', type=int, default=1)  # use 1 for now to make it easy
+    parser.add_argument('--yolo_box_length', type=int, default=9)  # conf, x, y, z, h, w, l, yaw_r, yaw_i
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
     return args
 

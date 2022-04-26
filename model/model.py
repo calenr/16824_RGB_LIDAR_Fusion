@@ -35,8 +35,8 @@ class RgbLidarFusion(nn.Module):
 
     def forward(self, image: torch.Tensor, lidar: list[torch.Tensor]) -> torch.Tensor:
         """
-        :param image: (Batch, 3, 375, 1242)
-        :param lidar: list of (N, 4), lenght of list must be equal to args.batch_size
+        :param image: (Batch, 3, 375, 1242) or a resized image
+        :param lidar: list of (N, 4), length of list must be equal to args.batch_size
         :return:
         """
         assert len(lidar) == self.args.batch_size
