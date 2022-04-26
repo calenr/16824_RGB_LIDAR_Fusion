@@ -209,32 +209,45 @@ class YoloLoss(nn.Module):
 
         return yolo_labels
 
-    def convert_label_norm_yolo_to_kitti(self, label: torch.Tensor):
-        assert isinstance(label, torch.Tensor)
-        assert len(label.shape) == 2
-        assert label.shape[1] == self.box_length
+    def convert_yolo_output_to_kitti_labels(self, output: torch.Tensor, calib: Calibration, conf_th: float=0.5):
+        """
+        output is the yolo raw output of a single example (not batched)
+        """
+        assert isinstance(output, torch.Tensor)
+        assert len(output.shape) == 3
+        assert output.shape[0] == self.box_length
 
         kitti_labels = []
 
-        for id in range(label.shape[0]):
+        output_grid_len_m = (self.z_range, self.y_range / output.shape[1], self.x_range / output.shape[2])  # ZYX, in metres
 
-            kitti_label = torch.zeros(15)
-            yolo_label = label[id]
+        for y_idx in range(output.shape[1]):
+            for x_idx in range(output.shape[2]):
+                # if the bbox of that grid has low confidence, skip it
+                if output[YOLOLABEL_IDX["conf"], y_idx, x_idx] < conf_th:
+                    continue
 
-            kitti_label[KITTILABEL_IDX["class"]] = 0
-            kitti_label[KITTILABEL_IDX["x"]] = yolo_label[YOLOLABEL_IDX["x"]]
-            kitti_label[KITTILABEL_IDX["y"]] = yolo_label[YOLOLABEL_IDX["y"]]
-            kitti_label[KITTILABEL_IDX["z"]] = yolo_label[YOLOLABEL_IDX["z"]]
-            kitti_label[KITTILABEL_IDX["h"]] = yolo_label[YOLOLABEL_IDX["h"]]
-            kitti_label[KITTILABEL_IDX["w"]] = yolo_label[YOLOLABEL_IDX["w"]]
-            kitti_label[KITTILABEL_IDX["l"]] = yolo_label[YOLOLABEL_IDX["l"]]
-            kitti_label[KITTILABEL_IDX["yaw"]] = torch.atan2(yolo_label[YOLOLABEL_IDX["yaw_i"]], yolo_label[YOLOLABEL_IDX["yaw_r"]])
+                kitti_label = torch.zeros(15)
+                yolo_label = output[:, y_idx, x_idx]
 
-            kitti_labels.append(kitti_label)
+                kitti_label[KITTILABEL_IDX["class"]] = CLASSNAMES_TO_IDX["Car"]
+                kitti_label[KITTILABEL_IDX["x"]] = yolo_label[YOLOLABEL_IDX["x"]] * output_grid_len_m[2] + self.x_offset + x_idx * output_grid_len_m[2]
+                kitti_label[KITTILABEL_IDX["y"]] = yolo_label[YOLOLABEL_IDX["y"]] * output_grid_len_m[1] + self.y_offset + y_idx * output_grid_len_m[1]
+                kitti_label[KITTILABEL_IDX["z"]] = yolo_label[YOLOLABEL_IDX["z"]] * output_grid_len_m[0] + self.z_offset
+                kitti_label[KITTILABEL_IDX["h"]] = yolo_label[YOLOLABEL_IDX["h"]] * self.anchors[0] + self.anchors[0]
+                kitti_label[KITTILABEL_IDX["w"]] = yolo_label[YOLOLABEL_IDX["w"]] * self.anchors[1] + self.anchors[1]
+                kitti_label[KITTILABEL_IDX["l"]] = yolo_label[YOLOLABEL_IDX["l"]] * self.anchors[2] + self.anchors[2]
+                kitti_label[KITTILABEL_IDX["yaw"]] = torch.atan2(yolo_label[YOLOLABEL_IDX["yaw_i"]], yolo_label[YOLOLABEL_IDX["yaw_r"]])
+
+                kitti_labels.append(kitti_label)
 
         if not kitti_labels:
             kitti_labels = None
         else:
             kitti_labels = torch.stack(kitti_labels)
+
+            kitti_labels_xyz = kitti_labels[:, KITTILABEL_IDX["x"]:KITTILABEL_IDX["z"]+1]
+            kitti_labels_xyz_np = kitti_labels_xyz.detach().to('cpu').numpy()
+            kitti_labels[:, KITTILABEL_IDX["x"]:KITTILABEL_IDX["z"]+1] = torch.from_numpy(calib.project_velo_to_rect(kitti_labels_xyz_np)).to(self.device)
 
         return kitti_labels
