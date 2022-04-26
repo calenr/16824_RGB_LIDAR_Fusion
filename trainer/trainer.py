@@ -33,7 +33,12 @@ class Trainer:
         if args.use_wandb:
             wandb.define_metric("train_step")
             wandb.define_metric("val_step")
-            wandb.define_metric("train/loss", step_metric="train_step")
+            wandb.define_metric("train/total_loss", step_metric="train_step")
+            wandb.define_metric("train/obj_conf_loss", step_metric="train_step")
+            wandb.define_metric("train/noobj_conf_loss", step_metric="train_step")
+            wandb.define_metric("train/coord_loss", step_metric="train_step")
+            wandb.define_metric("train/shape_loss", step_metric="train_step")
+            wandb.define_metric("train/angle_loss", step_metric="train_step")
             wandb.define_metric("train/map", step_metric="train_step")
             wandb.define_metric("train/lr", step_metric="train_step")
             wandb.define_metric("val/loss", step_metric="val_step")
@@ -45,8 +50,9 @@ class Trainer:
         """
         for epoch in range(self.start_epoch, self.args.num_epochs + 1):
             self.train_epoch(epoch)
+            # return
             self.scheduler.step()
-
+            
             if epoch % self.args.val_period == 0:
                 self.val_epoch(epoch)
 
@@ -71,19 +77,32 @@ class Trainer:
 
             self.optimizer.zero_grad()
             output = self.model(images, lidars)
-            loss = self.criterion(output, labels, calibs, self.args.pc_grid_size)
+            # output = torch.reshape(output, (1, 9, -1))
+            # output = output[0]
+            # idx = output[0, :] > 0.5
+            # print(idx.shape)
+            # print(output[:, idx])
+            # return
+            obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(output, labels, calibs, self.args.pc_grid_size)
+            loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
             loss.backward()
             self.optimizer.step()
 
             if self.train_step % self.args.log_period == 0:
                 # train_map = calc_map(output, label)
-                train_map = torch.zero(1)
+                train_map = torch.zeros(1)
                 print(f"epoch: {epoch}, batch_idx: {batch_idx}, train_loss: {loss}, train_map: {train_map}")
-                wandb.log({"train/loss": loss.item(),
-                           "train/map": train_map.item(),
-                           "train/lr": utils.get_lr(self.optimizer),
-                           "train_step": self.train_step,
-                           })
+                if self.args.use_wandb:
+                    wandb.log({"train/total_loss": loss.item(),
+                               "train/obj_conf_loss": obj_conf_loss.item(),
+                               "train/noobj_conf_loss": noobj_conf_loss.item(),
+                               "train/coord_loss": coord_loss.item(),
+                               "train/shape_loss": shape_loss.item(),
+                               "train/angle_loss": angle_loss.item(),
+                               "train/map": train_map.item(),
+                               "train/lr": utils.get_lr(self.optimizer),
+                               "train_step": self.train_step,
+                              })
 
     def val_epoch(self, epoch):
         """
@@ -109,8 +128,8 @@ class Trainer:
 
         # val_map = calc_map(output_agg, target_agg)
         # val_loss = self.criterion(output_agg, target_agg)
-        val_map = torch.zero(1)
-        val_loss = torch.zero(1)
+        val_map = torch.zeros(1)
+        val_loss = torch.zeros(1)
 
         if val_map > self.best_val_map:
             self.best_val_map = val_map
@@ -119,10 +138,11 @@ class Trainer:
             self.is_best = False
 
         print(f"VALIDATION epoch: {epoch}, val_loss: {val_loss}, val_map: {val_map}")
-        wandb.log({"val/loss": val_loss.item(),
-                   "val/map": val_map.item(),
-                   "val_step": self.val_step,
-                   })
+        if self.args.use_wandb:
+            wandb.log({"val/loss": val_loss.item(),
+                    "val/map": val_map.item(),
+                    "val_step": self.val_step,
+                    })
 
     def save_model(self, epoch, filename):
         """
