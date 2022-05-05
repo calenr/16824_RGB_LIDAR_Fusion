@@ -455,21 +455,39 @@ def draw_3d_output(pc_velo: np.ndarray, labels: list[np.ndarray], calib: Calibra
     
     show_lidar_with_boxes(pc_velo, objects, calib, preds)
 
+
+def draw_2d_box(image: np.ndarray, labels: list[np.ndarray], calib: Calibration, color=[0, 255, 0]):
+    objects = [Object3d(line, from_file=False) for line in labels]
+    for obj in objects:
+        if obj.type=='DontCare':continue
+        box3d_pts_2d, _ = compute_box_3d(obj, calib.P)
+        box3d_pts_2d = box3d_pts_2d.astype(np.int).tolist()
+        cv2.line(image, box3d_pts_2d[0], box3d_pts_2d[1], color, 2)
+        cv2.line(image, box3d_pts_2d[1], box3d_pts_2d[2], color, 2)
+        cv2.line(image, box3d_pts_2d[2], box3d_pts_2d[3], color, 2)
+        cv2.line(image, box3d_pts_2d[3], box3d_pts_2d[0], color, 2)
+
+        cv2.line(image, box3d_pts_2d[4], box3d_pts_2d[5], color, 2)
+        cv2.line(image, box3d_pts_2d[5], box3d_pts_2d[6], color, 2)
+        cv2.line(image, box3d_pts_2d[6], box3d_pts_2d[7], color, 2)
+        cv2.line(image, box3d_pts_2d[7], box3d_pts_2d[4], color, 2)
+
+        cv2.line(image, box3d_pts_2d[0], box3d_pts_2d[4], color, 2)
+        cv2.line(image, box3d_pts_2d[1], box3d_pts_2d[5], color, 2)
+        cv2.line(image, box3d_pts_2d[2], box3d_pts_2d[6], color, 2)
+        cv2.line(image, box3d_pts_2d[3], box3d_pts_2d[7], color, 2)
+
+    return image
+
 def draw_2d_output(image: np.ndarray, labels: list[np.ndarray], calib: Calibration, preds: list[np.ndarray]=None):
     """
     Example on how to use this function from training data
     draw_2d_output(image[0].to('cpu').permute(1, 2, 0).numpy(), label[0].numpy().tolist(), calib[0])
     """
-    objects = [Object3d(line, from_file=False) for line in labels]
     drawn_image = image.copy()
-    for obj in objects:
-        if obj.type=='DontCare':continue
-        box3d_pts_2d, _ = compute_box_3d(obj, calib.P)
-        box3d_pts_2d = box3d_pts_2d.astype(np.int).tolist()
-        for index, item in enumerate(box3d_pts_2d):
-            if index == len(box3d_pts_2d)-1:
-                break
-            cv2.line(drawn_image, item, box3d_pts_2d[index + 1], [0, 255, 0], 2) 
+    draw_2d_box(drawn_image, labels, calib, [0, 0, 255])
+    if preds is not None:
+        draw_2d_box(drawn_image, preds, calib, [0, 255, 0])
 
     cv2.imshow("Bbox", drawn_image)
     cv2.waitKey(0)

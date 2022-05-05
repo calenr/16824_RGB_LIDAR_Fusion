@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torchvision import transforms
 from model.metric import calc_map
 import utils.utils
 import wandb
@@ -125,7 +126,7 @@ class Trainer:
                 target = labels[example_idx]
                 calib = calibs[example_idx]
                 # TODO: add args.inference_conf_threshold
-                output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(output, calibs[example_idx], 0.0)
+                output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(output, calib, 0.0)
                 output_kitti_list.append(output_kitti.to('cpu'))
                 output_list.append(output.to('cpu'))
                 target_list.append(target.to('cpu'))
@@ -188,3 +189,20 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         print("Model checkpoint loaded")
+
+    def visualize_sample(self):
+        self.model.eval()
+        for batch_idx, batch_data in enumerate(self.val_loader):
+            images = batch_data['image'].to(self.args.device)
+            labels = batch_data['label']
+            lidars = batch_data['lidar']
+            calibs = batch_data['calib']
+
+            outputs = self.model(images, lidars)
+
+            output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(outputs[0], calibs[0], self.args.inference_conf_threshold)
+            draw_3d_output(lidars[0].to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0], output_kitti.detach().to('cpu').numpy().tolist())
+            resizer = transforms.Resize((self.args.ori_img_h, self.args.ori_img_w), antialias=True)
+            images = resizer(images)
+            draw_2d_output(images[0].permute(1, 2, 0).to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0], output_kitti.detach().to('cpu').numpy().tolist())
+            return

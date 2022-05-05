@@ -27,13 +27,13 @@ def get_args(arg_list=None):
     parser.add_argument('--num_data_loader_workers', type=int, default=multiprocessing.cpu_count())
     # monitor params
     parser.add_argument('--load_checkpoint', type=bool, default=False)
-    parser.add_argument('--checkpoint_path', type=str, default="results/checkpoint_epoch10.pth")
+    parser.add_argument('--checkpoint_path', type=str, default="results/checkpoint_epoch100-100samples.pth")
     parser.add_argument('--save_best_model', type=bool, default=False)
-    parser.add_argument('--save_model_checkpoint', type=bool, default=True)
+    parser.add_argument('--save_model_checkpoint', type=bool, default=False)
     parser.add_argument('--save_period', type=int, default=10)  # epoch
     parser.add_argument('--log_period', type=int, default=4)  # iteration
     parser.add_argument('--val_period', type=int, default=2000)  # epoch
-    parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--use_wandb', type=bool, default=False)
     # data params
     parser.add_argument('--image_size', type=int, default=448)
     # training params
@@ -57,7 +57,10 @@ def get_args(arg_list=None):
     parser.add_argument('--yolo_num_box_per_cell', type=int, default=1)  # use 1 for now to make it easy
     parser.add_argument('--yolo_box_length', type=int, default=9)  # conf, x, y, z, h, w, l, yaw_r, yaw_i
     # Validation params
-    parser.add_argument('--confidence_threshold', type=float, default=0.5)
+    parser.add_argument('--visualize_sample', type=bool, default=True)
+    parser.add_argument('--ori_img_h', type=int, default=375)
+    parser.add_argument('--ori_img_w', type=int, default=1242)
+    parser.add_argument('--inference_conf_threshold', type=float, default=0.5)
     parser.add_argument('--NMS_overlap_threshold', type=float, default=0.5)
     parser.add_argument('--MAP_overlap_threshold', type=float, default=0.5)
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
@@ -84,7 +87,10 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.scheduler_step, args.scheduler_gamma)
 
     trainer = Trainer(args, model, loss_fn, optimizer, scheduler, train_loader, val_loader)
-    trainer.train()
+    if args.visualize_sample:
+        trainer.visualize_sample()
+    else:
+        trainer.train()
 
     wandb.finish()
 
