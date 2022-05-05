@@ -6,7 +6,7 @@ from model.metric import calc_map
 import utils.utils
 import wandb
 from tqdm import tqdm
-from utils.kitti_viewer import draw_3d_output, draw_2d_output
+from utils.kitti_viewer import Calibration, draw_3d_output, draw_2d_output
 
 
 class Trainer:
@@ -116,24 +116,23 @@ class Trainer:
         self.val_step += 1
         self.model.eval()
 
-        output_agg = []
-        target_agg = []
+        output_list = []
+        target_list = []
+        calibs_list = []
 
         for batch_idx, batch_data in enumerate(tqdm(self.val_loader)):
             data, target = batch_data
             data, target = data.to(self.args.device), target.to(self.args.device)
-
+            
             output = self.model(data)
 
-            output_agg.append(output)
-            target_agg.append(target)
+            output_list.append(output)
+            target_list.append(target)
+            calibs_list.append(batch_data['calib'])
 
-        output_agg = torch.vstack(output_agg)
-        target_agg = torch.vstack(target_agg)
-
-        # val_map = calc_map(output_agg, target_agg)
-        # val_loss = self.criterion(output_agg, target_agg)
-        val_map = torch.zeros(1)
+        val_map = calc_map(output_list, target_list, calibs_list, self.args)
+        # val_loss = self.criterion(output_list, target_list)
+        # val_map = torch.zeros(1)
         val_loss = torch.zeros(1)
 
         if val_map > self.best_val_map:

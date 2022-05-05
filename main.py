@@ -56,6 +56,10 @@ def get_args(arg_list=None):
     parser.add_argument('--yolo_anchors', type=list[float], default=[1.56, 1.6, 3.9])  # h, w ,l
     parser.add_argument('--yolo_num_box_per_cell', type=int, default=1)  # use 1 for now to make it easy
     parser.add_argument('--yolo_box_length', type=int, default=9)  # conf, x, y, z, h, w, l, yaw_r, yaw_i
+    # Validation params
+    parser.add_argument('--confidence_threshold', type=float, default=0.5)
+    parser.add_argument('--NMS_overlap_threshold', type=float, default=0.5)
+    parser.add_argument('--MAP_overlap_threshold', type=float, default=0.5)
     args = parser.parse_args() if str is None else parser.parse_args(arg_list)
     return args
 
