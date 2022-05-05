@@ -1,22 +1,21 @@
 import torch
-# from utils.utils import calc_iou
-# from utils.data_structures import Bbox3D
-from third_party.Objectron.objectron.dataset.box import Box
-from third_party.Objectron.objectron.dataset.iou import IoU
-from model.loss import convert_yolo_output_to_kitti_labels
-from model.loss import KITTILABEL_IDX
+from utils.box import Box
+from utils.iou import IoU
+from .loss import KITTILABEL_IDX
 import numpy as np
 from sklearn.metrics import average_precision_score
 
-def convert_kitti_labels_to_objectron(self, bounding_boxes):
+def convert_kitti_labels_to_objectron(bounding_boxes: torch.Tensor):
     """
     Convert bounding boxes (stacked along axis=0) from the Kitti
     format to the Objectron format (8 vertices)
+    :param bounding_boxes: Tensor N x 16
+    :param objectron_box_list: list of objectron class
     """
 
     assert isinstance(bounding_boxes, torch.Tensor)
     assert len(bounding_boxes.shape) == 2
-    assert bounding_boxes.shape[1] == len(KITTILABEL_IDX)
+    assert bounding_boxes.shape[1] == len(KITTILABEL_IDX) or bounding_boxes.shape[1] == len(KITTILABEL_IDX) - 1
 
     objectron_box_list = []
 
@@ -27,9 +26,9 @@ def convert_kitti_labels_to_objectron(self, bounding_boxes):
             bounding_boxes[box_num, KITTILABEL_IDX["y"]],
             bounding_boxes[box_num, KITTILABEL_IDX["z"]]])
         scale = np.array([
-            bounding_boxes[box_num, KITTILABEL_IDX["h"]],
+            bounding_boxes[box_num, KITTILABEL_IDX["l"]],
             bounding_boxes[box_num, KITTILABEL_IDX["w"]],
-            bounding_boxes[box_num, KITTILABEL_IDX["l"]]])
+            bounding_boxes[box_num, KITTILABEL_IDX["h"]]])
         box = Box.from_transformation(rotation, translation, scale)
         objectron_box_list.append(box)
 
@@ -77,6 +76,7 @@ def calc_accuracy(output: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     :return: tensor accuracy
     """
     # TODO
+    raise NotImplementedError
     return torch.zeros_like(output)
 
 
@@ -87,59 +87,138 @@ def calc_ap(output: torch.Tensor, target: torch.Tensor, args) -> torch.Tensor:
     :param args: input args for model (i.e. threshold values)
     :return: tensor ap
     """
-    
-    output_box_list = convert_kitti_labels_to_objectron(output)
-    target_box_list = convert_kitti_labels_to_objectron(target)
-    target_to_output_indices = torch.zeros(target_box_list.shape[0])
-    # Match target bounding boxes with corresponding output bounding boxes
-    for target_num in range(len(target_box_list)):
-        cur_output_indice = -1
-        cur_iou = 0
-        for output_num in range(len(output_box_list)):
-            iou = IoU(target_box_list[target_num], output_box_list[output_num]).iou
-            if iou >= args.MAP_overlap_threshold and iou > cur_iou:
-                cur_output_indice = output_num
-                cur_iou = iou
-        target_to_output_indices[target_num] = cur_output_indice
-
     # Remove target boxes with matching output boxes?
 
     # Manual method
-    fn = torch.sum(target_to_output_indices.clamp(min=0.0)) - torch.sum(target_to_output_indices))
-    tp = target.shape[0] - fn
-    fp = output.shape[0] - tp
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn) # This is the accuracy metric, I think...
-    # How to calculate average precision??
+    # fn = torch.sum(target_to_output_indices.clamp(min=0.0)) - torch.sum(target_to_output_indices)
+    # tp = target.shape[0] - fn
+    # fp = output.shape[0] - tp
+    # precision = tp / (tp + fp)
+    # recall = tp / (tp + fn) # This is the accuracy metric, I think...
+    # # How to calculate average precision??
 
-    target_to_output_confidence_scores = torch.zeros(target_box_list.shape[0])
-    for ii in range(target_to_output_indices.shape[0]):
-        if target_to_output_indices[ii] == -1:
-            continue
-        else:
-            # target_to_output_confidence_scores[ii] = output_box_list[target_to_output_indices[ii]][KITTILABEL_IDX["Conf"]]
-            target_to_output_confidence_scores[ii] = 1.0
+    # target_to_output_confidence_scores = torch.zeros(target_box_list.shape[0])
+    # for ii in range(target_to_output_indices.shape[0]):
+    #     if target_to_output_indices[ii] == -1:
+    #         continue
+    #     else:
+    #         # target_to_output_confidence_scores[ii] = output_box_list[target_to_output_indices[ii]][KITTILABEL_IDX["Conf"]]
+    #         target_to_output_confidence_scores[ii] = 1.0
 
-    ap = average_precision_score(torch.ones(target.shape[0]), target_to_output_confidence_scores)
+    # ap = average_precision_score(torch.ones(target.shape[0]), target_to_output_confidence_scores)
     return torch.zeros_like(ap)
 
 
-def calc_map(output_list: list(torch.Tensor), target_list: list(torch.Tensor), calibs_list: list(torch.Tensor), args) -> torch.Tensor:
+def calc_map(output_kitti_list: list[torch.Tensor], target_kitti_list: list[torch.Tensor], MAP_overlap_threshold: float) -> torch.Tensor:
     """
-    :param output_list: list of tensor output from model
-    :param target_list: list of tensor ground truth
-    :param calibs_list: list of calibration information
-    :param args: input args for model (i.e. threshold values)
+    :param output_kitti: list of tensor output in kitti format (N, 16), each entry of the list is for one example
+    :param target_kitti: list of tensor ground truth in kitti format (N, 15), each entry of the list is for one example
+    :param MAP_overlap_threshold: minimum iou value to be considered true positive
     :return: tensor map
     """
-    # TODO
+    assert(isinstance(output_kitti_list, list))
+    assert(isinstance(target_kitti_list, list))
+    assert(len(output_kitti_list) > 0)
+    assert(len(output_kitti_list) == len(target_kitti_list))
+    assert(output_kitti_list[0].shape[1] == len(KITTILABEL_IDX))
+    assert(target_kitti_list[0].shape[1] == len(KITTILABEL_IDX) - 1)
 
-    ap = torch.zeros(len(output_list))
-    for sample_num in range(len(output_list)):
-        output_kitti, confidence_list = convert_yolo_output_to_kitti_labels(output_list[sample_num], calibs_list[sample_num], args.confidence_threshold)
+    # stacked_target = torch.stack(target_kitti_list)
+    # N_samples = stacked_target.shape[0]
+
+    pred_for_ap = []
+    target_for_ap = []
+    # Processing one example from the batch
+    for example_idx in range(len(target_kitti_list)):
+        output_kitti = output_kitti_list[example_idx]
+        target_kitti = target_kitti_list[example_idx]
         # Sort output_kitti by confidence_list (descending)
-        sorted_output_kitti = output_kitti
-        suppressed_output = NMS(sorted_output_kitti, args.NMS_overlap_threshold)
-        ap[sample_num] = calc_ap(suppressed_output, target_list[sample_num], args)
-    map = torch.mean(ap)
-    return map
+        _, conf_sort_idx = torch.sort(output_kitti[:, KITTILABEL_IDX["conf"]], dim=0, descending=True)
+        sorted_output_kitti = output_kitti[conf_sort_idx]
+        # suppressed_output = NMS(sorted_output_kitti, args.NMS_overlap_threshold)
+
+        output_objectron_list = convert_kitti_labels_to_objectron(sorted_output_kitti)
+        target_objectron_list = convert_kitti_labels_to_objectron(target_kitti)
+        target_to_output_indices = torch.zeros(len(target_objectron_list), dtype=torch.long)
+        # Match target bounding boxes with corresponding output bounding boxes
+        for target_idx, target_objectron in enumerate(target_objectron_list):
+            cur_output_indice = -1
+            cur_iou = 0
+            for output_idx, output_objectron in enumerate(output_objectron_list):
+                iou = IoU(output_objectron, target_objectron).iou()
+                if iou >= MAP_overlap_threshold and iou > cur_iou:
+                    cur_output_indice = output_idx
+                    cur_iou = iou
+            target_to_output_indices[target_idx] = cur_output_indice
+
+        # Now iterate through the matched target and output bbox and fill in conf values
+        for ii in range(target_to_output_indices.shape[0]):
+            if target_to_output_indices[ii] == -1:
+                # False negative
+                pred_for_ap.append(0)
+                target_for_ap.append(1)
+            else:
+                # True positive
+                pred_for_ap.append(sorted_output_kitti[target_to_output_indices[ii], KITTILABEL_IDX["conf"]].item())
+                target_for_ap.append(1)
+
+        for ii in range(sorted_output_kitti.shape[0]):
+            if ii in target_to_output_indices:
+                # This output bbox has been matched to a gt, hence skip
+                continue
+            else:
+                # False positive
+                pred_for_ap.append(sorted_output_kitti[target_to_output_indices[ii], KITTILABEL_IDX["conf"]].item())
+                target_for_ap.append(0)
+
+    pred_for_ap = np.stack(pred_for_ap)
+    target_for_ap = np.stack(target_for_ap)
+
+    print(pred_for_ap)
+    print(target_for_ap)
+
+    ap = average_precision_score(target_for_ap, pred_for_ap)
+
+    # ap[sample_num] = calc_ap(sorted_output_kitti, target_list[sample_num], args)
+    # map = torch.mean(ap)
+    return ap
+
+def test():
+    # Conclusion: you translate then rotate
+    # to debug IOU
+    # kitti_label_1 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0, 0, 0, 0, 0.8])
+    # kitti_label_2 = np.array([0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 3, 1, 1, 0, 1.57, 0.8])
+    # kitti_label_1 = torch.from_numpy(kitti_label_1)
+    # kitti_label_2 = torch.from_numpy(kitti_label_2)
+    # kitti_label_1 = torch.unsqueeze(kitti_label_1, dim=0)
+    # kitti_label_2 = torch.unsqueeze(kitti_label_2, dim=0)
+    # objectron_1 = convert_kitti_labels_to_objectron(kitti_label_1)
+    # objectron_2 = convert_kitti_labels_to_objectron(kitti_label_2)
+    # iou = IoU(objectron_1[0], objectron_2[0]).iou()
+    # print(iou)
+
+    output_kitti_list = []
+    output1 = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3.01, 5, 0, 0, 0.2, 0.8],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 10, 0.01, 0, 0.3, 0.8],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 0, 0.01, 0.4, 0.8]])
+    output1 = torch.from_numpy(output1)
+    output2 = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0, 10.01, 0, 0.1, 0.8],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0.01, 20, 0, 0.2, 0.8],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0, 0, 30.01, 0.3, 0.8]])
+    output2 = torch.from_numpy(output2)
+    output_kitti_list.append(output1)
+    output_kitti_list.append(output2)
+
+    target_kitti_list = []
+    target1 = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3.01, 5.1, 0.2, -.2, 0.1],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 10, 0.01, 0.1, 0.2],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 20, 0, 0.01, 0.3]])
+    target1 = torch.from_numpy(target1)
+    target2 = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0, 10.01, 0.2, 0.3],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0.01, 20, 0.1, 0.1],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 0.1, 0.4, 30.01, 0]])
+    target2 = torch.from_numpy(target2)
+    target_kitti_list.append(target1)
+    target_kitti_list.append(target2)
+
+    print(calc_map(output_kitti_list, target_kitti_list, 0.5))

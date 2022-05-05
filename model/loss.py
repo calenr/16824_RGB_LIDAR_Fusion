@@ -24,6 +24,7 @@ KITTILABEL_IDX = {
     "y": 12,
     "z": 13,
     "yaw": 14,
+    "conf": 15,
 }
 
 YOLOLABEL_IDX = {
@@ -178,7 +179,7 @@ class YoloLoss(nn.Module):
 
         assert isinstance(label, torch.Tensor)
         assert len(label.shape) == 2
-        assert label.shape[1] == 15
+        assert label.shape[1] == len(KITTILABEL_IDX) - 1
 
         yolo_labels = []
 
@@ -211,7 +212,8 @@ class YoloLoss(nn.Module):
 
     def convert_yolo_output_to_kitti_labels(self, output: torch.Tensor, calib: Calibration, conf_th: float=0.5):
         """
-        output is the yolo raw output of a single example (not batched)
+        :param output: is the yolo raw output of a single example (not batched)
+        :out kitti_labels: tensor N x 16
         """
         assert isinstance(output, torch.Tensor)
         assert len(output.shape) == 3
@@ -227,7 +229,7 @@ class YoloLoss(nn.Module):
                 if output[YOLOLABEL_IDX["conf"], y_idx, x_idx] < conf_th:
                     continue
 
-                kitti_label = torch.zeros(15)
+                kitti_label = torch.zeros(len(KITTILABEL_IDX))
                 yolo_label = output[:, y_idx, x_idx]
 
                 kitti_label[KITTILABEL_IDX["class"]] = CLASSNAMES_TO_IDX["Car"]
@@ -238,6 +240,7 @@ class YoloLoss(nn.Module):
                 kitti_label[KITTILABEL_IDX["w"]] = yolo_label[YOLOLABEL_IDX["w"]] * self.anchors[1] + self.anchors[1]
                 kitti_label[KITTILABEL_IDX["l"]] = yolo_label[YOLOLABEL_IDX["l"]] * self.anchors[2] + self.anchors[2]
                 kitti_label[KITTILABEL_IDX["yaw"]] = torch.atan2(yolo_label[YOLOLABEL_IDX["yaw_i"]], yolo_label[YOLOLABEL_IDX["yaw_r"]])
+                kitti_label[KITTILABEL_IDX["conf"]] = yolo_label[YOLOLABEL_IDX["conf"]]
 
                 kitti_labels.append(kitti_label)
 
