@@ -77,19 +77,8 @@ class Trainer:
             self.optimizer.zero_grad()
             outputs = self.model(images, lidars)
 
-            # TODO clean up this messy inference code 
-            # output = torch.reshape(outputs[0], (-1, 9))
-            # idx = torch.sigmoid(output[:, 0]) > 0.7
-            # idx = idx.nonzero().squeeze()
-            # pred = output[idx, :]
-            # pred_kitti = self.criterion.convert_label_yolo_to_kitti(pred)
-            # print(pred_kitti.shape)
-            # print(labels[0].shape)
             obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(outputs, labels, calibs, self.args.pc_grid_size)
             loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
-            # print(loss)
-            # draw_3d_output(lidars[0].to('cpu').numpy(), labels[0].numpy().tolist(), calibs[0], pred_kitti.detach().to('cpu').numpy().tolist())
-            # return
             loss.backward()
             self.optimizer.step()
 
@@ -108,6 +97,8 @@ class Trainer:
                                "train/lr": utils.get_lr(self.optimizer),
                                "train_step": self.train_step,
                               })
+            
+            torch.cuda.empty_cache()
 
     def val_epoch(self, epoch):
         """
@@ -116,24 +107,37 @@ class Trainer:
         self.val_step += 1
         self.model.eval()
 
+        output_kitti_list = []
         output_list = []
         target_list = []
         calibs_list = []
 
         for batch_idx, batch_data in enumerate(tqdm(self.val_loader)):
-            data, target = batch_data
-            data, target = data.to(self.args.device), target.to(self.args.device)
+            images = batch_data['image'].to(self.args.device)
+            labels = batch_data['label']
+            lidars = batch_data['lidar']
+            calibs = batch_data['calib']
+
+            outputs = self.model(images, lidars)
             
-            output = self.model(data)
+            for example_idx in range(outputs.shape[0]):
+                output = outputs[example_idx]
+                target = labels[example_idx]
+                calib = calibs[example_idx]
+                # TODO: add args.inference_conf_threshold
+                output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(output, calibs[example_idx], 0.0)
+                output_kitti_list.append(output_kitti.to('cpu'))
+                output_list.append(output.to('cpu'))
+                target_list.append(target.to('cpu'))
+                calibs_list.append(calib)
 
-            output_list.append(output)
-            target_list.append(target)
-            calibs_list.append(batch_data['calib'])
+            torch.cuda.empty_cache()
 
-        val_map = calc_map(output_list, target_list, calibs_list, self.args)
-        # val_loss = self.criterion(output_list, target_list)
-        # val_map = torch.zeros(1)
-        val_loss = torch.zeros(1)
+        val_map = calc_map(output_list, target_list, self.args.MAP_overlap_threshold)
+
+        output_stacked = torch.stack(output_list)
+        obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(output_stacked, target_list, calibs_list, self.args.pc_grid_size)
+        val_loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
 
         if val_map > self.best_val_map:
             self.best_val_map = val_map
@@ -147,6 +151,8 @@ class Trainer:
                     "val/map": val_map.item(),
                     "val_step": self.val_step,
                     })
+
+        torch.cuda.empty_cache()
 
     def save_model(self, epoch, filename):
         """

@@ -45,6 +45,7 @@ def get_transforms(args) -> tuple[transforms.Compose, transforms.Compose]:
 
     val_tf = transforms.Compose([
         transforms.ToTensor(),
+        transforms.Resize((args.image_size, args.image_size), antialias=True)
     ])
 
     return train_tf, val_tf
@@ -75,15 +76,11 @@ class KittiDataset(Dataset):
         print(f"Num images files: {len(self.image_files)}")
 
         # Get label file paths
-        if training:
-            self.label_data_path = osp.join(data_path, "data_object_label_2", split, "label_2")
-            assert osp.exists(self.label_data_path)
-            self.label_files = sorted(os.listdir(self.label_data_path))
-            assert len(self.label_files) == len(self.image_files)
-            print(f"Num label files: {len(self.label_files)}")
-        else:
-            self.label_data_path = None
-            self.label_files = None
+        self.label_data_path = osp.join(data_path, "data_object_label_2", split, "label_2")
+        assert osp.exists(self.label_data_path)
+        self.label_files = sorted(os.listdir(self.label_data_path))
+        assert len(self.label_files) == len(self.image_files)
+        print(f"Num label files: {len(self.label_files)}")
 
         # Get velodyne file paths
         self.velodyne_data_path = osp.join(data_path, "data_object_velodyne", split, "velodyne")
@@ -113,20 +110,17 @@ class KittiDataset(Dataset):
         label_list = []
 
         # Load Labels
-        if self.training:
-            label_path = osp.join(self.label_data_path, self.label_files[idx])
-            labels = [line.rstrip() for line in open(label_path)]
-            for label in labels:
-                data = label.split(' ')
-                data[1:] = [float(x) for x in data[1:]]
-                if data[0] in CLASSNAMES_TO_IDX.keys():
-                    data[0] = CLASSNAMES_TO_IDX[data[0]]
-                else:
-                    data[0] = len(CLASSNAMES_TO_IDX.items())
+        label_path = osp.join(self.label_data_path, self.label_files[idx])
+        labels = [line.rstrip() for line in open(label_path)]
+        for label in labels:
+            data = label.split(' ')
+            data[1:] = [float(x) for x in data[1:]]
+            if data[0] in CLASSNAMES_TO_IDX.keys():
+                data[0] = CLASSNAMES_TO_IDX[data[0]]
+            else:
+                data[0] = len(CLASSNAMES_TO_IDX.items())
 
-                label_list.append(torch.Tensor(data))
-        else:
-            label_tensor = torch.zeros(1)
+            label_list.append(torch.Tensor(data))
 
         label_tensor = torch.stack(label_list)
 

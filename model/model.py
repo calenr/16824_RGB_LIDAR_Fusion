@@ -37,7 +37,7 @@ class RgbLidarFusion(nn.Module):
         """
         :param image: (Batch, 3, 375, 1242) or a resized image
         :param lidar: list of (N, 4), length of list must be equal to args.batch_size
-        :return:
+        :return: Tensor (Batch, box_length, output_grid_y, output_grid_x)
         """
         assert len(lidar) == self.args.batch_size
 
