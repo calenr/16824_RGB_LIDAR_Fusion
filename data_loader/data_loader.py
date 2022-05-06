@@ -36,16 +36,17 @@ def get_transforms(args) -> tuple[transforms.Compose, transforms.Compose]:
     :param args:
     :return: transform composition for train and val
     """
-    # TODO
-
     train_tf = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((args.image_size, args.image_size), antialias=True)
+        transforms.Resize((args.image_size, args.image_size), antialias=True),
+        transforms.ColorJitter(0.05, 0.05, 0.05, 0.05),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
     val_tf = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((args.image_size, args.image_size), antialias=True)
+        transforms.Resize((args.image_size, args.image_size), antialias=True),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
     return train_tf, val_tf
@@ -55,9 +56,6 @@ class KittiDataset(Dataset):
     """
     DataSet class to that holds and returns the KITTI data
     """
-
-    # TODO
-
     def __init__(self, args, data_path: str, transform: transforms.Compose = None,
                  training: bool = True):
         if transform is not None:
@@ -160,7 +158,7 @@ def get_data_loaders(args) -> tuple[DataLoader, DataLoader]:
                               )
 
     val_loader = DataLoader(dataset=val_dataset,
-                            batch_size=args.batch_size,
+                            batch_size=1,
                             shuffle=True,
                             num_workers=args.num_data_loader_workers,
                             drop_last=True,

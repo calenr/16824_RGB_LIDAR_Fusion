@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from .resnet import ResBlock
+from .resnet import ResBlockDown
 
 YOLOLABEL_IDX = {
     "conf": 0,
@@ -19,7 +19,7 @@ class YoloHead(nn.Module):
         super(YoloHead, self).__init__()
         self.box_length = box_length
         self.output_dim = num_box_per_cell * box_length
-        self.classifier = ResBlock(input_dim, self.output_dim)
+        self.classifier = ResBlockDown(input_dim, self.output_dim)
         self.relu = nn.ReLU()
 
     def forward(self, fused_feat: torch.Tensor):

@@ -6,10 +6,16 @@
 
 - Tested on Ubuntu 18.04 with RTX3070 and CUDA 11.3
 
+```
+conda env create -f environment.yml
+```
+
+OR
+
 ```commandline
 conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 conda install scikit-image scipy numba pillow matplotlib flask pyqtgraph pyopengl
-pip install fire tensorboardX protobuf opencv-python spconv-cu113 tqdm wandb
+pip install fire tensorboardX protobuf opencv-python spconv-cu113 tqdm wandb scikit-learn
 ```
 
 ## Implementation

@@ -1,8 +1,0 @@
-torch
-torchvision
-numpy
-tqdm
-tensorboard
-wandb
-spconv-cu102
-sklearn
