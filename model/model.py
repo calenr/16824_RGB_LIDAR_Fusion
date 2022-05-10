@@ -52,6 +52,4 @@ class RgbLidarFusion(nn.Module):
         fused_feat = self.fused_feat_cnn(fused_feat)
         out = self.detection_head(fused_feat)
 
-        # print(f"output shape: {out.shape}")
-
         return out
