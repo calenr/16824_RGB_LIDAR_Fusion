@@ -1,5 +1,5 @@
 # RGB LiDAR Fusion
-
+https://calenr.github.io/16824_RGB_LIDAR_Fusion/
 ## Description
 
 End-to-end PyTorch model to detect cars in 3D by fusing RGB and LiDAR features. Trained and tested on KITTI dataset.
