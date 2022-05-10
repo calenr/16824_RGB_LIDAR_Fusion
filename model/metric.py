@@ -1,7 +1,7 @@
 import torch
 from utils.box import Box
 from utils.iou import IoU
-from .loss import KITTILABEL_IDX
+from .loss import KITTILABEL_IDX, CLASSNAMES_TO_IDX
 import numpy as np
 from sklearn.metrics import average_precision_score
 
@@ -20,6 +20,8 @@ def convert_kitti_labels_to_objectron(bounding_boxes: torch.Tensor):
     objectron_box_list = []
 
     for box_num in range(bounding_boxes.shape[0]):
+        if bounding_boxes[box_num, KITTILABEL_IDX["class"]] != CLASSNAMES_TO_IDX["Car"]:
+            continue
         rotation = np.array([0, 0, bounding_boxes[box_num, KITTILABEL_IDX["yaw"]]])
         translation = np.array([
             bounding_boxes[box_num, KITTILABEL_IDX["x"]],
@@ -168,15 +170,11 @@ def calc_map(output_kitti_list: list[torch.Tensor], target_kitti_list: list[torc
                 continue
             else:
                 # False positive
-                pred_for_ap.append(sorted_output_kitti[target_to_output_indices[ii], KITTILABEL_IDX["conf"]].item())
+                pred_for_ap.append(sorted_output_kitti[ii, KITTILABEL_IDX["conf"]].item())
                 target_for_ap.append(0)
 
     pred_for_ap = np.stack(pred_for_ap)
     target_for_ap = np.stack(target_for_ap)
-
-    print(pred_for_ap)
-    print(target_for_ap)
-
     ap = average_precision_score(target_for_ap, pred_for_ap)
 
     # ap[sample_num] = calc_ap(sorted_output_kitti, target_list[sample_num], args)

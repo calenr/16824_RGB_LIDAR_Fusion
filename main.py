@@ -26,22 +26,22 @@ def get_args(arg_list=None):
     parser.add_argument('--device', default=torch.device("cuda"))
     parser.add_argument('--num_data_loader_workers', type=int, default=multiprocessing.cpu_count())
     # monitor params
-    parser.add_argument('--load_checkpoint', type=bool, default=False)
-    parser.add_argument('--checkpoint_path', type=str, default="results/checkpoint_epoch6.pth")
+    parser.add_argument('--load_checkpoint', type=bool, default=True)
+    parser.add_argument('--checkpoint_path', type=str, default="results/checkpoint_epoch45.pth")
     parser.add_argument('--save_best_model', type=bool, default=False)
     parser.add_argument('--save_model_checkpoint', type=bool, default=True)
-    parser.add_argument('--save_period', type=int, default=5)  # epoch
+    parser.add_argument('--save_period', type=int, default=1)  # epoch
     parser.add_argument('--log_period', type=int, default=4)  # iteration
-    parser.add_argument('--val_period', type=int, default=1000)  # epoch
-    parser.add_argument('--use_wandb', type=bool, default=True)
+    parser.add_argument('--val_period', type=int, default=1)  # epoch
+    parser.add_argument('--use_wandb', type=bool, default=False)
     # data params
     parser.add_argument('--image_size', type=int, default=448)
     # training params
     parser.add_argument('--batch_size', type=int, default=3)
-    parser.add_argument('--num_epochs', type=int, default=60)
+    parser.add_argument('--num_epochs', type=int, default=46)
     parser.add_argument('--lr', type=float, default=1e-2)
-    parser.add_argument('--scheduler_step', type=int, default=10)
-    parser.add_argument('--scheduler_gamma', type=float, default=0.1)
+    parser.add_argument('--scheduler_step', type=int, default=1)
+    parser.add_argument('--scheduler_gamma', type=float, default=0.2)
     # Pointcloud encoder params
     parser.add_argument('--pc_num_input_features', type=int, default=4)
     parser.add_argument('--pc_use_norm', type=bool, default=True)

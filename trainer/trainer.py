@@ -50,9 +50,9 @@ class Trainer:
         run the training sequence, validate and save models along the way
         """
         for epoch in range(self.start_epoch, self.args.num_epochs + 1):
-            self.train_epoch(epoch)
+            # self.train_epoch(epoch)
             # return
-            self.scheduler.step()
+            # self.scheduler.step()
 
             if epoch % self.args.val_period == 0:
                 self.val_epoch(epoch)
@@ -99,61 +99,59 @@ class Trainer:
                                "train_step": self.train_step,
                               })
             
-            torch.cuda.empty_cache()
-
     def val_epoch(self, epoch):
         """
         One epoch of validation
         """
-        self.val_step += 1
-        self.model.eval()
+        with torch.no_grad():
+            self.val_step += 1
+            self.model.eval()
 
-        output_kitti_list = []
-        output_list = []
-        target_list = []
-        calibs_list = []
+            output_kitti_list = []
+            output_list = []
+            target_list = []
+            calibs_list = []
 
-        for batch_idx, batch_data in enumerate(tqdm(self.val_loader)):
-            images = batch_data['image'].to(self.args.device)
-            labels = batch_data['label']
-            lidars = batch_data['lidar']
-            calibs = batch_data['calib']
+            for batch_idx, batch_data in enumerate(tqdm(self.val_loader)):
+                images = batch_data['image'].to(self.args.device)
+                labels = batch_data['label']
+                lidars = batch_data['lidar']
+                calibs = batch_data['calib']
 
-            outputs = self.model(images, lidars)
-            
-            for example_idx in range(outputs.shape[0]):
-                output = outputs[example_idx]
-                target = labels[example_idx]
-                calib = calibs[example_idx]
-                # TODO: add args.inference_conf_threshold
-                output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(output, calib, 0.0)
-                output_kitti_list.append(output_kitti.to('cpu'))
-                output_list.append(output.to('cpu'))
-                target_list.append(target.to('cpu'))
-                calibs_list.append(calib)
+                outputs = self.model(images, lidars)
 
-            torch.cuda.empty_cache()
+                for example_idx in range(outputs.shape[0]):
+                    output = outputs[example_idx]
+                    target = labels[example_idx]
+                    calib = calibs[example_idx]
+                    # TODO: add args.inference_conf_threshold
+                    output_kitti = self.criterion.convert_yolo_output_to_kitti_labels(output, calib, 0)
+                    if output_kitti is None:
+                        continue
+                    output_kitti_list.append(output_kitti.to('cpu'))
+                    output_list.append(output.to('cpu'))
+                    target_list.append(target.to('cpu'))
+                    calibs_list.append(calib)
 
-        val_map = calc_map(output_list, target_list, self.args.MAP_overlap_threshold)
+            val_map = calc_map(output_kitti_list, target_list, self.args.MAP_overlap_threshold)
+            val_loss = torch.zeros(1)
 
-        output_stacked = torch.stack(output_list)
-        obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(output_stacked, target_list, calibs_list, self.args.pc_grid_size)
-        val_loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
+            # output_stacked = torch.stack(output_list)
+            # obj_conf_loss, noobj_conf_loss, coord_loss, shape_loss, angle_loss = self.criterion(output_stacked, target_list, calibs_list, self.args.pc_grid_size)
+            # val_loss = obj_conf_loss + noobj_conf_loss + coord_loss + shape_loss + angle_loss
 
-        if val_map > self.best_val_map:
-            self.best_val_map = val_map
-            self.is_best = True
-        else:
-            self.is_best = False
+            if val_map > self.best_val_map:
+                self.best_val_map = val_map
+                self.is_best = True
+            else:
+                self.is_best = False
 
-        print(f"VALIDATION epoch: {epoch}, val_loss: {val_loss}, val_map: {val_map}")
-        if self.args.use_wandb:
-            wandb.log({"val/loss": val_loss.item(),
-                    "val/map": val_map.item(),
-                    "val_step": self.val_step,
-                    })
-
-        torch.cuda.empty_cache()
+            print(f"VALIDATION epoch: {epoch}, val_loss: {val_loss}, val_map: {val_map}")
+            if self.args.use_wandb:
+                wandb.log({"val/loss": val_loss.item(),
+                        "val/map": val_map.item(),
+                        "val_step": self.val_step,
+                        })
 
     def save_model(self, epoch, filename):
         """
