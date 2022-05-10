@@ -16,6 +16,17 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 </head>
 <body>
 
+<!-- Navbar -->
+<div class="w3-top">
+  <div class="w3-bar w3-red w3-card w3-left-align w3-large">
+    <a href="index.html#Motivation" class="w3-bar-item w3-button w3-padding-large w3-white">Motivation</a>
+    <a href="index.html#PriorWork" class="w3-bar-item w3-button w3-hide-small w3-padding-large w3-hover-white">Prior Work</a>
+    <a href="index.html#OurIdea" class="w3-bar-item w3-button w3-hide-small w3-padding-large w3-hover-white">Our Idea</a>
+    <a href="index.html#Results" class="w3-bar-item w3-button w3-hide-small w3-padding-large w3-hover-white">Results</a>
+    <a href="index.html#FutureDirections" class="w3-bar-item w3-button w3-hide-small w3-padding-large w3-hover-white">Future Directions</a>
+  </div>
+</div>
+
 <!-- Header -->
 <header class="w3-container w3-red w3-center" style="padding:128px 16px">
   <h1 class="w3-margin w3-jumbo">RGB LIDAR Fusion</h1>
@@ -25,31 +36,51 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 </header>
 
 <!-- Motivation -->
-<div class="w3-row-padding w3-padding-64 w3-container">
+<div id="Motivation" class="w3-row-padding w3-padding-64 w3-container">
   <div class="w3-content">
     <div class="w3-twothird">
       <h1>Motivation</h1>
 
-      <h5 class="w3-text-grey">Modern self-driving methods utilize a mixture of sensor modalities to ascertain the current situation in the environment.  This combination of sensors strengthens the overall system by covering the shortcomings of the individual sensors alone.  
-	  For example, LIDAR information is accurate and consistent, but expensive and easily obfuscated by dust.  Meanwhile, image data is dense and cheap but is inconsistent and inaccurate.  Therefore, modern self-driving vehicles depend on the fusion of multiple modalities 
-	  to ensure accuracy and consistency.  Training networks that can handle the information from multiple modalities, and even provide multiplicative strengths, is essential to improving solving self-driving.</h5>
+      <h5 class="w3-text-grey">The self-driving problem requires detecting and localizing a variety of object classes with high confidence so 
+	  that the robot can understand its surroundings and reason about how to interact with the flow of traffic to maintain both driver and 
+	  civilian safety. Modern self-driving methods accomplish this by utilizing a mixture of sensor modalities to better understand the current 
+	  environment of the car. This combination of sensors strengthens the overall system by covering the shortcomings of each individual sensor 
+	  alone. For example, LIDAR sensors are accurate and consistent, but expensive and easily obfuscated by dust. Alternatively, image data is 
+	  dense and cheap but also inconsistent and inaccurate. Therefore, modern self-driving vehicles depend on the fusion of multiple modalities 
+	  to ensure accuracy and consistency.  Training networks that can handle the information from multiple modalities, and even provide 
+	  multiplicative strengths, is essential to improving the capability of self-driving algorithms.</h5>
     </div>
 
     <div class="w3-third w3-center">
-	  <i class="fa fa-anchor w3-padding-64 w3-text-red"></i>
+	  <br>
+	  <br>
+	  <br>
+	  <br>
+	  <img src="assets/images/car.png" alt="Car" height="200" width="300">
     </div>
   </div>
 </div>
 
 <!-- Prior Work -->
-<div class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
+<div id="PriorWork" class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
   <div class="w3-content">
     <div class="w3-third w3-center">
-      <i class="fa fa-coffee w3-padding-64 w3-text-red w3-margin-right"></i>
+      <img src="assets/images/books.png" alt="Books" height="300" width="300">
     </div>
 
     <div class="w3-twothird">
       <h1>Prior Work</h1>
+	  <h5 class="w3-text-grey">Self-driving is a hot research area currently, but not that many papers have been written about Lidar-camera sensor 
+	  fusion for object detection and localization. In [1], Wen and Jo achieve sensor fusion by converting the Lidar information into voxels and 
+	  superimposing it onto the camera images. In [2], Yang, Liang, and Urtasun propose a method for either using high-definition maps as the basis 
+	  for a prior, or converting the streamed Lidar data into a 3-d map that can subsequently be used for object detection from a top-down perspective.
+	  In [3],  a variety of architectures are used to combine Lidar and camera information, specifically early vs late fusion. Early fusion methods 
+	  start by combining the Lidar and camera information, before passing anything through the networks. Late fusion methods pass raw or transformed 
+	  data into networks to develop a series of features. These features are then fused and passed through a detection head. In [4], Vora, Lang, Helou, 
+	  and Beijbom start by creating a segmentation filter over the 2-dimensional image. This semantic painting is then projected onto the lidar point 
+	  cloud, from which 3d bounding boxes are developed. In [5], Salazar-Gomez, Saavedra-Ruiz, and Romero-Cano use frustum region proposals generated 
+	  by 2D object detectors to segment LiDAR point clouds into point clusters.</h5>
+	  
       <h5 class="w3-padding-32">
 		[1] Fast and Accurate 3D Object Detection for Lidar-Camera-Based Autonomous Vehicles Using One Shared Voxel-Based Backbone
 		<a href="https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9340187">https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9340187</a>
@@ -66,70 +97,136 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 		[5] High-level camera-LiDAR fusion for 3D object detection with machine learning
 		<a href="https://arxiv.org/pdf/2105.11060.pdf">https://arxiv.org/pdf/2105.11060.pdf</a>
 	  </h5>
-
-      <h5 class="w3-text-grey">The first paper converts the Lidar information into voxels and superimposes it onto the camera images.  The second paper proposes a method for converting Lidar data into 3-d maps.  The third paper combines Lidar and camera information 
-	  in a few different ways, using different architectures. The fourth paper projects lidar onto an image-segmentation output for embeddings. The fifth paper uses frustum region proposals generated by 2D object detectors to segment LiDAR point clouds into point 
-	  clusters.</h5>
     </div>
   </div>
 </div>
 
-<!-- Your Idea -->
-<div class="w3-row-padding w3-padding-64 w3-container">
+<!-- Our Idea -->
+<div id="OurIdea" class="w3-row-padding w3-padding-64 w3-container">
   <div class="w3-content">
-    <div class="w3-twothird">
       <h1>Our Idea</h1>
-      <h5 class="w3-padding-32">What is the idea?</h5>
-      <h5 class="w3-text-grey">The central idea is to fuse LiDAR and camera data together to produce robust 3D object detection (x, y, z, r, p, y) for use in self-driving applications. 3D object detection requires depth information which LiDAR can provide. 
-	  However, the difficulty with working with LiDAR pointcloud is that they are large in size (~100MB per pointcloud) and are unstructured (as opposed to image data that can have constant pixel dimensions). Therefore, part of the work will be in finding 
-	  a good way to encode the LiDAR data into a fixed feature space so that we can concatenate it with image embeddings to use Deep Learning models on it. In addition, we plan on using Resnet as a base line, then trying other architectures such as ConvNext 
-	  or MobileNet if time allows.</h5>
-	  
-	  <h5 class="w3-padding-32">Why does your idea make sense intuitively?</h5>
-      <h5 class="w3-text-grey"> This idea makes intuitive sense because it combines the strengths of different types of sensors. Lidars are useful for determining the precise 3D coordinates of objects in a scene, and cameras are good for classifying objects. 
-	  Fusing these two sensors can provide robust classification and localization. However, fusing these two sensors requires a good representation of each. Cameras are straight forward, but lidar embeddings are still an area of active research. We hope to 
-	  see how different embeddings affect the overall performance of the network.</h5>
-
-	  <h5 class="w3-padding-32">How does it relate to prior work in the area?</h5>
-      <h5 class="w3-text-grey"> We want to take the ideas of sensor fusion in 3D LiDAR-based datasets and apply new and improved object detection algorithms to see the performance. The prior work listed has provided various sensor fusion methods with various 
-	  learning methods, we hope to build off of various successes found in their work to combine into a novel system for 3D object detection.</h5>
-    </div>
-
-    <div class="w3-third w3-center">
-      <i class="fa fa-anchor w3-padding-64 w3-text-red"></i>
-    </div>
+      <h3 class="w3-padding-32">What is the idea?</h3>
+      <h5 class="w3-text-grey">The central idea is to fuse LiDAR and camera data together to produce robust, 3D object detection (x, y, z, r, p, y) 
+	  for use in self-driving applications. The purpose of using both LiDAR and camera data is because the camera data can provide strong textural 
+	  understanding of where cars are located in the image, while the LiDAR data can provide highly-accurate depth information. However, the difficulty 
+	  with working with LiDAR point cloud data is that they are large in size (~100MB per point cloud) and are unstructured (as opposed to image data 
+	  that has constant pixel dimensions). We project features from the camera data onto the LiDAR data, which places all of the information into a 
+	  common embedding shape, allowing us to easily fuse the data via concatenation. This fused data is then processed with a resnet backbone and a 
+	  YOLO detection head. The reason we used YOLO was because our network is aiming at online applications and this makes YOLO’s speed more favorable 
+	  over a small increase in accuracy.</h5>
+	  <br>
+	  <img src="assets/images/model_layout.png" alt="Model Layout" height="300" width="800">
+	  <br>
+	  <br>
+	  <h5 class="w3-padding-32">Data Preprocessing</h5>
+	  <h5 class="w3-text-grey">The RGB images come from the KITTI dataset at 1242x375 pixels. We resize each image to a 448x448 pixel square to fit the 
+	  pre-trained ResNet image encoder and augment the images with color jitter and gaussian noise to prevent overfitting. The point cloud comes from 
+	  the KITTI dataset as a binary file. We translate the binary into an Np x 4 tensor of (x,y,z,R) where Np is the number of points in the cloud. For 
+	  data augmentation, we add random gaussian noise to the x, y, z, and R values of each point.</h5>
+	  <br>
+	  <img src="assets/images/pcl_embedding.png" alt="PCL Embedding" height="400" width="800">
+	  <br>
+	  <br>
+	  <h5 class="w3-padding-32">Point Cloud Embedding</h5>
+	  <h5 class="w3-text-grey">The point cloud embedding process is as follows. We create an L x W x N grid, where L is the length, W is the width, and 
+	  N is the max number of lidar points that 2D point can store. Each lidar point that falls within a grid space is in one of the $$n in N$$ grid spaces. 
+	  This is then unrolled into a P x N x D matrix, where P is L x W and D is 4. The D dimension stores the (x, y, z, r) tuple for each lidar point. Next 
+	  we do point augmentation to go from D = 4 to D = 9. The 5 new pieces of information are TODO FILL ME IN. This is passed through TODO FILL ME IN linear 
+	  layers, such that the result matrix is P x N x C, where C is 256. We max along the N dimension and reshape to L x W x C. This is the final point cloud 
+	  embedding.</h5>
+	  <br>
+	  <div class="w3-twothird">
+		  <h5 class="w3-padding-32">Image Embedding </h5>
+		  <h5 class="w3-text-grey">For our image embedder we fine tuned resnet18, but did not use its last 3 layers. The resulting matrix is C x M x M. M is 
+		  the output shape of the image. We then resize this to C x L x W.</h5>
+		  <br>
+		  <h5 class="w3-padding-32">Sensor Fusion</h5>
+		  <h5 class="w3-text-grey">We have a C x L x W lidar embedding and a C x L x W image embedding. We concatenate them to get a 2C x L x W fused embedding.</h5>
+		  <br>
+	  </div>
+	  <div class="w3-third w3-center">
+	    <br>
+		<br>
+		<img src="assets/images/sensor_fusion.png" alt="Sensor Fusion" height="400" width="350">
+		<br>
+		<br>
+		<br>
+      </div>
+	  <h5 class="w3-padding-32">Detection Head</h5>
+	  <h5 class="w3-text-grey">The detection head at the end of our architecture was a reimplementation of YOLO v5. YOLO’s end-to-end training allows us to 
+	  quickly generate 3d bounding boxes from our input data, along with confidence scores for each of them. Non-max suppression allows us to remove overlapping 
+	  bounding boxes and identify the best possible expected bounding boxes.</h5>
+	  <br>
+	  <img src="assets/images/detection_head.png" alt="Detection Head" height="400" width="800">
+	  <br>
+	  <br>
+	  <h3 class="w3-padding-32">Why does your idea make sense intuitively?</h3>
+      <h5 class="w3-text-grey"> This idea makes intuitive sense because it combines the strengths of different types of sensors. Lidars are useful for 
+	  determining the precise 3D coordinates of objects in a scene, and cameras are good for classifying objects. Fusing these two sensors can provide 
+	  robust classification and localization. However, fusing these two sensors requires a good representation of each. Cameras are straight forward, 
+	  but lidar embeddings are still an area of active research. By creating a latent embedding space that is the same for each sensor we make the process 
+	  of fusing the data rather straightforward.</h5>
+	  <br>
+	  <h3 class="w3-padding-32">How does it relate to prior work in the area?</h3>
+      <h5 class="w3-text-grey"> We took the ideas of sensor fusion in 3D LiDAR-based datasets and applied new and improved object detection algorithms 
+	  to see the performance. The prior work listed has provided various sensor fusion methods with various learning methods, we built off of various 
+	  successes found in their work to combine into a novel system for 3D object detection.</h5>
   </div>
 </div>
-<div class="w3-row-padding w3-padding-64 w3-container">
-	<div class="w3-content">
-		<img src="assets/images/model_layout.png" alt="Model Layout" height="300" width="800">
-	</div>
-</div>
+
 
 <!-- Results -->
-<div class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
+<div id="Results" class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
   <div class="w3-content">
-    <div class="w3-third w3-center">
-      <i class="fa fa-coffee w3-padding-64 w3-text-red w3-margin-right"></i>
-    </div>
-
-    <div class="w3-twothird">
-      <h1>Results</h1>
-      <h5 class="w3-padding-32">Placeholder</h5>
-
-      <p class="w3-text-grey">More placeholder</p>
-    </div>
+	<h1>Results</h1>
+	<h5 class="w3-text-grey">We used the KITTI data set and trained our model to detect cars.</h5>
+	
+	<h5 class="w3-padding-32">Output Bounding Boxes</h5>
+	<img src="assets/images/good1-2d.png" alt="good1-2d" height="300" width="800">
+	<img src="assets/images/good1.png" alt="good1" height="400" width="800">
+	<hr>
+	<img src="assets/images/good2-2d.png" alt="good2-2d" height="300" width="800">
+	<img src="assets/images/good2.png" alt="good2" height="400" width="800">
+	<hr>
+	<img src="assets/images/good3-2d.png" alt="good3-2d" height="300" width="800">
+	<img src="assets/images/good3.png" alt="good3" height="400" width="800">
+	<hr>
+	<img src="assets/images/good4-2d.png" alt="good4-2d" height="300" width="800">
+	<img src="assets/images/good4.png" alt="good4" height="400" width="800">
+	<hr>
+	<img src="assets/images/good6-2d.png" alt="good6-2d" height="300" width="800">
+	<img src="assets/images/good6.png" alt="good6" height="400" width="800">
+	<hr>
+	
+	<h5 class="w3-padding-32">Comparison with other models</h5>
+	<h5 class="w3-text-grey">Based on the performance of many networks that used the image and the lidar data from this dataset (shown below), our 
+	network mAP is relatively low and only truly beats out PC-CNN from 2018 while having similar success to MV3D.</h5>
+	<h5 class="w3-text-grey">Baseline:</h5>
+	<img src="assets/images/baseline_comparisons.jpeg" alt="Baseline" height="300" width="800">
+	<h5 class="w3-text-grey">Our Results:</h5>
+	<img src="assets/images/mAP_dataset.png" alt="mAP" height="20" width="800">
+	
+	<h5 class="w3-padding-32">Negative Results / Model Challenges</h5>
+	<h5 class="w3-text-grey">Our model struggled with cars in the far distances, particularly due to the sparsity of point cloud points making the YOLO 
+	discrete 3D space miss it. As far as self-driving is concerned, this is not an issue because a car that’s too far away to detect is not in danger of 
+	an immediate collision. Additionally, the model mAP was reduced when it identified trucks as cars because the ground truth has trucks labeled separately 
+	from cars, but in our model implementation this would be standardly correct as we are trying to detect all vehicles in a self-driving application. The 
+	model output shown below expresses these challenges with a detection on a truck that does not match up with a ground truth car box as well as a car in 
+	the far field that is not detected.</h5>
+	<img src="assets/images/good5-2d.png" alt="good5-2d" height="300" width="800">
+	<img src="assets/images/good5.png" alt="good5" height="400" width="800">
   </div>
 </div>
 
 <!-- Conclusion -->
-<div class="w3-row-padding w3-padding-64 w3-container">
+<div id="Conclusion" class="w3-row-padding w3-padding-64 w3-container">
   <div class="w3-content">
     <div class="w3-twothird">
       <h1>Conclusion</h1>
-      <h5 class="w3-padding-32">Not a placeholder</h5>
-
-      <p class="w3-text-grey">Just kidding it is</p>
+      <h5 class="w3-padding-32">Our method has shown a keen ability to detect and localize vehicles from an input of RGB and LiDAR data. As our model stands, 
+	  it shows great promise for self-driving applications because it identifies and projects accurate bounding boxes for vehicles with a decent success rate. 
+	  With the implementation of some of the ideas listed under future directions, we believe that the performance of this model could be improved greatly and 
+	  eventually become the state of the art for vehicle detection and localization from fused sensor data.</h5>
     </div>
 
     <div class="w3-third w3-center">
@@ -139,7 +236,7 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 </div>
 
 <!-- Future Directions -->
-<div class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
+<div id="FutureDirections" class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
   <div class="w3-content">
     <div class="w3-third w3-center">
       <i class="fa fa-coffee w3-padding-64 w3-text-red w3-margin-right"></i>
@@ -147,12 +244,18 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 
     <div class="w3-twothird">
       <h1>Future Directions</h1>
-      <h5 class="w3-padding-32">Shrodinger's Placeholder</h5>
-
-      <p class="w3-text-grey">You decide whether or not it's a placeholder</p>
+      <h5 class="w3-padding-32">In the future, we would like to test our algorithm using different image encoders or backbones such as different sizes of ResNet, 
+	  MobileNet, or ConvNeXt. We would also like to increase the number of detections our network is making, searching for multiple bounding boxes per grid cell. 
+	  We could also ask our network to search for multiple object classes, such as pedestrians and street signs, instead of just cars. In addition, we could try a 
+	  different detection head other than the YOLOv5. Finally, we would like to test our algorithm on different data sets.</h5>
     </div>
   </div>
 </div>
+
+<!-- Footer -->
+<footer class="w3-container w3-padding-64 w3-center w3-opacity">  
+ <p>Project for Carnegie Mellon University's Robotics Insitute course <a href="https://visual-learning.cs.cmu.edu/" target="_blank">16-824 Visual Learning & Recognition</a></p>
+</footer>
 
 </body>
 </html>
