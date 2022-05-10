@@ -16,7 +16,7 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 </head>
 <body>
 
-<!-- Navbar -->
+<!-- Navbar 
 <div class="w3-top">
   <div class="w3-bar w3-red w3-card w3-left-align w3-large">
     <a href="index.html#Motivation" class="w3-bar-item w3-button w3-padding-large w3-white">Motivation</a>
@@ -115,7 +115,7 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 	  YOLO detection head. The reason we used YOLO was because our network is aiming at online applications and this makes YOLO’s speed more favorable 
 	  over a small increase in accuracy.</h5>
 	  <br>
-	  <img src="assets/images/model_layout.png" alt="Model Layout" height="300" width="800">
+	  <img src="assets/images/model_layout.png" alt="Model Layout" height="300" width="1000">
 	  <br>
 	  <br>
 	  <h5 class="w3-padding-32">Data Preprocessing</h5>
@@ -124,16 +124,18 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 	  the KITTI dataset as a binary file. We translate the binary into an Np x 4 tensor of (x,y,z,R) where Np is the number of points in the cloud. For 
 	  data augmentation, we add random gaussian noise to the x, y, z, and R values of each point.</h5>
 	  <br>
-	  <img src="assets/images/pcl_embedding.png" alt="PCL Embedding" height="400" width="800">
+	  <img src="assets/images/pcl_embedding.png" alt="PCL Embedding" height="400" width="1000">
 	  <br>
 	  <br>
 	  <h5 class="w3-padding-32">Point Cloud Embedding</h5>
 	  <h5 class="w3-text-grey">The point cloud embedding process is as follows. We create an L x W x N grid, where L is the length, W is the width, and 
-	  N is the max number of lidar points that 2D point can store. Each lidar point that falls within a grid space is in one of the $$n in N$$ grid spaces. 
-	  This is then unrolled into a P x N x D matrix, where P is L x W and D is 4. The D dimension stores the (x, y, z, r) tuple for each lidar point. Next 
-	  we do point augmentation to go from D = 4 to D = 9. The 5 new pieces of information are TODO FILL ME IN. This is passed through TODO FILL ME IN linear 
-	  layers, such that the result matrix is P x N x C, where C is 256. We max along the N dimension and reshape to L x W x C. This is the final point cloud 
-	  embedding.</h5>
+	  N is the max number of lidar points that a grid can store. If there are less points in the cell than N, we pad them with zero and note down the 
+	  number of real points. If there are more than N points per cell, we randomly select N points from it to get an estimated distribution. The voxel 
+	  grid is then unrolled into a P x N x D matrix, where P is L x W and D is 4. The D dimension stores the (x, y, z, r) tuple for each lidar point. Next 
+	  we do point augmentation to go from D = 4 to D = 9. The 5 new pieces of information are x, y, z offset from the x, y, z mean of points in their 
+	  corresponding cell, and the x and y offset from each cell center point. This is then passed through several linear layers to extract learned features, 
+	  such that the result matrix is P x N x C, where C is 128 or 256. We max along the N dimension and reshape back to L x W x C, which is critical because 
+	  our point cloud embedding thus preserves its spatial relationship.</h5>
 	  <br>
 	  <div class="w3-twothird">
 		  <h5 class="w3-padding-32">Image Embedding </h5>
@@ -153,11 +155,33 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 		<br>
       </div>
 	  <h5 class="w3-padding-32">Detection Head</h5>
-	  <h5 class="w3-text-grey">The detection head at the end of our architecture was a reimplementation of YOLO v5. YOLO’s end-to-end training allows us to 
-	  quickly generate 3d bounding boxes from our input data, along with confidence scores for each of them. Non-max suppression allows us to remove overlapping 
-	  bounding boxes and identify the best possible expected bounding boxes.</h5>
+	  <h5 class="w3-text-grey">The detection head at the end of our architecture was a reimplementation of YOLO. YOLO’s end-to-end training allows us to quickly 
+	  generate 3D bounding boxes from our input data, along with confidence scores for each of them. Similar to 2D YOLO, we did not directly predict the raw values, 
+	  because they would be numerically stable. For example, objects can be 2, 20, or 120 meters away from our vehicle, orders of magnitude different. This would 
+	  cause a number of problems with YOLO’s output because it isn’t flexible or precise enough to handle such large variations in some variables, but only differences 
+	  from 0 to 1 in other variables. Therefore, to create some similarity between the YOLO outputs, the YOLO head predicts the offset from each cell corner that is 
+	  normalized to the cell height and width. Furthermore, instead of predicting the shape of the bbox, we predict the shape offset from an ‘average’ shape, these are 
+	  known as anchor boxes. Together, these changes result in YOLO outputting numbers roughly between 0 and 1 for all of  YOLO’s diverse outputs. Lastly, predicting 
+	  the yaw angle in Euler angles is difficult due to wrap around, for example the loss function will consider 0.1 degree and 359.9 degree to be far apart when in 
+	  reality they are almost identical. Therefore, we predict the real and imaginary components of the yaw angle with complex decomposition. For the loss function, we 
+	  first create an obj mask to mark down which of the cells contains a ground truth, and a noobj mask which is an inverse of the obj mask. We use the obj mask to 
+	  ensure that we are only penalizing the model for having incorrect object-related losses when there is a ground truth result in the given cell. The noobj loss is 
+	  used to penalize false positives. We use Mean Square Error on each of the loss types (obj confidence, no obj confidence, coordinate, shape, and angle), and tune 
+	  the weights of each of these losses.</h5>
 	  <br>
-	  <img src="assets/images/detection_head.png" alt="Detection Head" height="400" width="800">
+	  <img src="assets/images/detection_head.png" alt="Detection Head" height="400" width="1000">
+	  <br>
+	  <br>
+	  <h5 class="w3-padding-32">Learning Rate</h5>
+	  <h5 class="w3-text-grey">Our initial learning rate of 1e-2 seemed to work well for our training purposes, but when plotted on a logarithmic scale it became 
+	  clear that our learning rate only functioned correctly for the first 10 or 20 epochs. Therefore, we made an adjustment to our method and added a step-based 
+	  learning rate scheduler that cut the learning rate by a tenth every ten epochs, down to a minimum of 1e-6. After implementing this learning rate scheduler, 
+	  our model trained excellently, continuing to reduce its loss even after running for 30 or more epochs. In total, our loss dropped from an initial value of 
+	  1 all the way down to 1e-4. This is particularly important for our application as localizing 3d bounding boxes with sufficient IoU is difficult to achieve 
+	  or improve and our YOLO detection head has a complex loss that requires minimizing along multiple dimensions.</h5>
+	  <br>
+	  <img src="assets/images/lr.png" alt="LR" height="180" width="330">
+	  <img src="assets/images/loss.png" alt="Loss" height="400" width="1000">
 	  <br>
 	  <br>
 	  <h3 class="w3-padding-32">Why does your idea make sense intuitively?</h3>
@@ -182,29 +206,31 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 	<h5 class="w3-text-grey">We used the KITTI data set and trained our model to detect cars.</h5>
 	
 	<h5 class="w3-padding-32">Output Bounding Boxes</h5>
-	<img src="assets/images/good1-2d.png" alt="good1-2d" height="300" width="800">
-	<img src="assets/images/good1.png" alt="good1" height="400" width="800">
+	<p class="w3-text-grey"> Note: All RGB Images in the validation set are normalized with mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225].
 	<hr>
-	<img src="assets/images/good2-2d.png" alt="good2-2d" height="300" width="800">
-	<img src="assets/images/good2.png" alt="good2" height="400" width="800">
+	<img src="assets/images/good1-2d.png" alt="good1-2d" height="350" width="1000">
+	<img src="assets/images/good1.png" alt="good1" height="450" width="1000">
 	<hr>
-	<img src="assets/images/good3-2d.png" alt="good3-2d" height="300" width="800">
-	<img src="assets/images/good3.png" alt="good3" height="400" width="800">
+	<img src="assets/images/good2-2d.png" alt="good2-2d" height="350" width="1000">
+	<img src="assets/images/good2.png" alt="good2" height="450" width="1000">
 	<hr>
-	<img src="assets/images/good4-2d.png" alt="good4-2d" height="300" width="800">
-	<img src="assets/images/good4.png" alt="good4" height="400" width="800">
+	<img src="assets/images/good3-2d.png" alt="good3-2d" height="350" width="1000">
+	<img src="assets/images/good3.png" alt="good3" height="450" width="1000">
 	<hr>
-	<img src="assets/images/good6-2d.png" alt="good6-2d" height="300" width="800">
-	<img src="assets/images/good6.png" alt="good6" height="400" width="800">
+	<img src="assets/images/good4-2d.png" alt="good4-2d" height="350" width="1000">
+	<img src="assets/images/good4.png" alt="good4" height="450" width="1000">
+	<hr>
+	<img src="assets/images/good6-2d.png" alt="good6-2d" height="350" width="1000">
+	<img src="assets/images/good6.png" alt="good6" height="450" width="1000">
 	<hr>
 	
 	<h5 class="w3-padding-32">Comparison with other models</h5>
 	<h5 class="w3-text-grey">Based on the performance of many networks that used the image and the lidar data from this dataset (shown below), our 
 	network mAP is relatively low and only truly beats out PC-CNN from 2018 while having similar success to MV3D.</h5>
 	<h5 class="w3-text-grey">Baseline:</h5>
-	<img src="assets/images/baseline_comparisons.jpeg" alt="Baseline" height="300" width="800">
+	<img src="assets/images/baseline_comparisons.jpeg" alt="Baseline" height="300" width="750">
 	<h5 class="w3-text-grey">Our Results:</h5>
-	<img src="assets/images/mAP_dataset.png" alt="mAP" height="20" width="800">
+	<h5 class="w3-text-grey">Validation mAP after 45 epochs = 0.63296 [63.296%]</h5>
 	
 	<h5 class="w3-padding-32">Negative Results / Model Challenges</h5>
 	<h5 class="w3-text-grey">Our model struggled with cars in the far distances, particularly due to the sparsity of point cloud points making the YOLO 
@@ -213,8 +239,8 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 	from cars, but in our model implementation this would be standardly correct as we are trying to detect all vehicles in a self-driving application. The 
 	model output shown below expresses these challenges with a detection on a truck that does not match up with a ground truth car box as well as a car in 
 	the far field that is not detected.</h5>
-	<img src="assets/images/good5-2d.png" alt="good5-2d" height="300" width="800">
-	<img src="assets/images/good5.png" alt="good5" height="400" width="800">
+	<img src="assets/images/good5-2d.png" alt="good5-2d" height="350" width="1000">
+	<img src="assets/images/good5.png" alt="good5" height="450" width="1000">
   </div>
 </div>
 
@@ -239,7 +265,9 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
 <div id="FutureDirections" class="w3-row-padding w3-light-grey w3-padding-64 w3-container">
   <div class="w3-content">
     <div class="w3-third w3-center">
-      <i class="fa fa-coffee w3-padding-64 w3-text-red w3-margin-right"></i>
+	  <br>
+	  <br>
+      <img src="assets/images/self-driving_car.png" alt="AutoCar" height="200" width="280">
     </div>
 
     <div class="w3-twothird">
@@ -247,7 +275,7 @@ body,h1,h2,h3,h4,h5,h6 {font-family: "Lato", sans-serif}
       <h5 class="w3-padding-32">In the future, we would like to test our algorithm using different image encoders or backbones such as different sizes of ResNet, 
 	  MobileNet, or ConvNeXt. We would also like to increase the number of detections our network is making, searching for multiple bounding boxes per grid cell. 
 	  We could also ask our network to search for multiple object classes, such as pedestrians and street signs, instead of just cars. In addition, we could try a 
-	  different detection head other than the YOLOv5. Finally, we would like to test our algorithm on different data sets.</h5>
+	  different detection head other than the YOLO. Finally, we would like to test our algorithm on different data sets.</h5>
     </div>
   </div>
 </div>
